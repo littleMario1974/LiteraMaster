@@ -159,10 +159,6 @@ onBackPressedDispatcher.addCallback(this) {
         val isPowerSave =
     (getSystemService(POWER_SERVICE) as PowerManager).isPowerSaveMode
 
-val nightMode =
-    resources.configuration.uiMode and
-            android.content.res.Configuration.UI_MODE_NIGHT_MASK
-
 textView.setTextColor(
     if (isPowerSave) Color.WHITE else Color.BLACK
 )
