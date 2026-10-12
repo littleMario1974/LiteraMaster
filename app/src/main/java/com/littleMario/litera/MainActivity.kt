@@ -164,15 +164,7 @@ val nightMode =
             android.content.res.Configuration.UI_MODE_NIGHT_MASK
 
 textView.setTextColor(
-    when {
-        isPowerSave -> Color.WHITE
-
-        nightMode == android.content.res.Configuration.UI_MODE_NIGHT_YES ->
-            Color.WHITE
-
-        else ->
-            Color.BLACK
-    }
+    if (isPowerSave) Color.WHITE else Color.BLACK
 )
 
         return view
