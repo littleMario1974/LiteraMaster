@@ -43,60 +43,71 @@
         <!-- LITERY -->
 
         <EditText
-            android:id="@+id/inputField"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_margin="16dp"
-            android:hint="twoje litery"
-            android:inputType="textVisiblePassword"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/showDescriptionButton" />
+    android:id="@+id/inputField"
+    android:layout_width="0dp"
+    android:layout_height="wrap_content"
+    android:layout_margin="16dp"
+    android:hint="twoje litery"
+    android:inputType="textVisiblePassword"
+    android:textColor="#000000"
+    android:textColorHint="#757575"
+    android:backgroundTint="#808080"
+    app:layout_constraintEnd_toEndOf="parent"
+    app:layout_constraintStart_toStartOf="parent"
+    app:layout_constraintTop_toBottomOf="@id/showDescriptionButton" />
 
-        <!-- POCZĄTEK -->
+<!-- POCZĄTEK -->
+
+       <EditText
+    android:id="@+id/startFilter"
+    android:layout_width="0dp"
+    android:layout_height="wrap_content"
+    android:layout_marginStart="16dp"
+    android:layout_marginTop="8dp"
+    android:layout_marginEnd="16dp"
+    android:hint="początek"
+    android:textColor="#000000"
+    android:textColorHint="#757575"
+    android:backgroundTint="#808080"
+    app:layout_constraintEnd_toEndOf="parent"
+    app:layout_constraintStart_toStartOf="parent"
+    app:layout_constraintTop_toBottomOf="@id/inputField" />
+
+<!-- ZAWIERA -->
+
+       <EditText
+    android:id="@+id/containsFilter"
+    android:layout_width="0dp"
+    android:layout_height="wrap_content"
+    android:layout_marginStart="16dp"
+    android:layout_marginTop="8dp"
+    android:layout_marginEnd="16dp"
+    android:hint="zawiera"
+    android:textColor="#000000"
+    android:textColorHint="#757575"
+    android:backgroundTint="#808080"
+    app:layout_constraintEnd_toEndOf="parent"
+    app:layout_constraintStart_toStartOf="parent"
+    app:layout_constraintTop_toBottomOf="@id/startFilter" />
+
+<!-- KONIEC -->
 
         <EditText
-            android:id="@+id/startFilter"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
-            android:layout_marginTop="8dp"
-            android:layout_marginEnd="16dp"
-            android:hint="początek"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/inputField" />
+    android:id="@+id/endFilter"
+    android:layout_width="0dp"
+    android:layout_height="wrap_content"
+    android:layout_marginStart="16dp"
+    android:layout_marginTop="8dp"
+    android:layout_marginEnd="16dp"
+    android:hint="koniec"
+    android:textColor="#000000"
+    android:textColorHint="#757575"
+    android:backgroundTint="#808080"
+    app:layout_constraintEnd_toEndOf="parent"
+    app:layout_constraintStart_toStartOf="parent"
+    app:layout_constraintTop_toBottomOf="@id/containsFilter" />
 
-        <!-- ZAWIERA -->
-
-        <EditText
-            android:id="@+id/containsFilter"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
-            android:layout_marginTop="8dp"
-            android:layout_marginEnd="16dp"
-            android:hint="zawiera"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/startFilter" />
-
-        <!-- KONIEC -->
-
-        <EditText
-            android:id="@+id/endFilter"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
-            android:layout_marginTop="8dp"
-            android:layout_marginEnd="16dp"
-            android:hint="koniec"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/containsFilter" />
-
-        <!-- DŁUGOŚĆ -->
-
+<!-- DŁUGOŚĆ -->
         <LinearLayout
             android:id="@+id/lengthRow"
             android:layout_width="0dp"
@@ -109,22 +120,29 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/endFilter">
 
-            <EditText
-                android:id="@+id/minLength"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:hint="min."
-                android:inputType="number" />
+        <EditText
+    android:id="@+id/minLength"
+    android:layout_width="0dp"
+    android:layout_height="wrap_content"
+    android:layout_weight="1"
+    android:hint="min."
+    android:textColor="#000000"
+    android:textColorHint="#757575"
+    android:backgroundTint="#808080"
+    android:inputType="number" />
 
-            <EditText
-                android:id="@+id/maxLength"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:layout_weight="1"
-                android:hint="max."
-                android:inputType="number" />
+<EditText
+    android:id="@+id/maxLength"
+    android:layout_width="0dp"
+    android:layout_height="wrap_content"
+    android:layout_marginStart="8dp"
+    android:layout_weight="1"
+    android:hint="max."
+    android:textColor="#000000"
+    android:textColorHint="#757575"
+    android:backgroundTint="#808080"
+    android:inputType="number" />
+
         </LinearLayout>
 
         <!-- PRZYCISKI -->
