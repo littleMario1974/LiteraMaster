@@ -464,8 +464,8 @@ wordList.adapter = adapter
         return false
     }
 
-   private fun setThemeColors() {
-
+   
+private fun setThemeColors() {
     val isPowerSave =
         (getSystemService(POWER_SERVICE) as PowerManager).isPowerSaveMode
 
@@ -477,10 +477,31 @@ wordList.adapter = adapter
                 R.drawable.background
         )
 
+    val textColor = if (isPowerSave) Color.WHITE else Color.BLACK
+    val hintColor = if (isPowerSave) 0xFFCCCCCC.toInt() else 0xFF757575.toInt()
+    val underlineColor = if (isPowerSave) 0xFFCCCCCC.toInt() else 0xFF808080.toInt()
+
+    val fields = listOf(
+        inputField,
+        startFilter,
+        containsFilter,
+        endFilter,
+        minLengthField,
+        maxLengthField
+    )
+
+    fields.forEach { field ->
+        field.setTextColor(textColor)
+        field.setHintTextColor(hintColor)
+        field.backgroundTintList =
+            android.content.res.ColorStateList.valueOf(underlineColor)
+    }
+
     if (::adapter.isInitialized) {
         adapter.notifyDataSetChanged()
     }
 }
+
 
     private fun setupLetterFilter(editText: EditText, maxBlanks: Int = Int.MAX_VALUE) {
 
