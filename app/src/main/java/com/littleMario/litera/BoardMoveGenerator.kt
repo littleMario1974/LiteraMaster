@@ -45,6 +45,8 @@ class BoardMoveGenerator(
                         board = board,
                         row = row,
                         column = column,
+                        startRow = row,
+                        startColumn = column,
                         horizontal = horizontal,
                         nodeId = rootId,
                         counts = counts,
@@ -70,6 +72,8 @@ class BoardMoveGenerator(
         board: BoardState,
         row: Int,
         column: Int,
+        startRow: Int,
+        startColumn: Int,
         horizontal: Boolean,
         nodeId: Int,
         counts: IntArray,
@@ -90,8 +94,8 @@ class BoardMoveGenerator(
             if (child == -1) return
 
             path.append(alphabet[index])
-            recordIfComplete(board, nextRow, nextColumn, horizontal, child, path, placements, results)
-            search(board, nextRow, nextColumn, horizontal, child, counts, path, placements, results)
+            recordIfComplete(board, nextRow, nextColumn, startRow, startColumn, horizontal, child, path, placements, results)
+            search(board, nextRow, nextColumn, startRow, startColumn, horizontal, child, counts, path, placements, results)
             path.deleteCharAt(path.length - 1)
             return
         }
@@ -116,8 +120,8 @@ class BoardMoveGenerator(
                 )
             )
 
-            recordIfComplete(board, nextRow, nextColumn, horizontal, child, path, placements, results)
-            search(board, nextRow, nextColumn, horizontal, child, counts, path, placements, results)
+            recordIfComplete(board, nextRow, nextColumn, startRow, startColumn, horizontal, child, path, placements, results)
+            search(board, nextRow, nextColumn, startRow, startColumn, horizontal, child, counts, path, placements, results)
 
             placements.removeAt(placements.lastIndex)
             path.deleteCharAt(path.length - 1)
@@ -129,6 +133,8 @@ class BoardMoveGenerator(
         board: BoardState,
         nextRow: Int,
         nextColumn: Int,
+        startRow: Int,
+        startColumn: Int,
         horizontal: Boolean,
         nodeId: Int,
         path: StringBuilder,
@@ -139,11 +145,9 @@ class BoardMoveGenerator(
         if (inside(nextRow, nextColumn) && board.tileAt(nextRow, nextColumn) != null) return
 
         val coversCenter = if (horizontal) {
-            path.length > 0 && placements.any { it.row == 7 && it.column == 7 } ||
-                (7 == placements.firstOrNull()?.row && 7 in placements.first().column..(placements.last().column))
+            startRow == 7 && 7 in startColumn until (startColumn + path.length)
         } else {
-            placements.any { it.column == 7 && it.row == 7 } ||
-                (7 == placements.firstOrNull()?.column && 7 in placements.first().row..(placements.last().row))
+            startColumn == 7 && 7 in startRow until (startRow + path.length)
         }
         val touchesBoard = board.occupiedTiles().isNotEmpty() &&
             placements.any { placed ->
@@ -158,36 +162,11 @@ class BoardMoveGenerator(
 
         if (!crossWordsAreValid(board, placements, horizontal)) return
 
-        val first = pathCoordinatesStart(placements, horizontal, path.length)
-        val key = "${if (horizontal) 'H' else 'V'}:${first.first}:${first.second}:${path}"
+        val key = "${if (horizontal) 'H' else 'V'}:$startRow:$startColumn:$path"
         results.putIfAbsent(
             key,
-            BoardMove(path.toString(), first.first, first.second, horizontal, placements.toList())
+            BoardMove(path.toString(), startRow, startColumn, horizontal, placements.toList())
         )
-    }
-
-    private fun pathCoordinatesStart(
-        placements: List<PlacedTile>,
-        horizontal: Boolean,
-        wordLength: Int
-    ): Pair<Int, Int> {
-        // Placements are collected in reading order; an existing tile may precede them.
-        val firstPlaced = placements.first()
-        var row = firstPlaced.row
-        var column = firstPlaced.column
-        repeat(wordLength) {
-            val previousRow = row - if (horizontal) 0 else 1
-            val previousColumn = column - if (horizontal) 1 else 0
-            if (inside(previousRow, previousColumn)) {
-                // The actual start is found by walking back through occupied board cells.
-                // The first placement is always the earliest newly placed cell.
-                val previous = previousRow to previousColumn
-                if (placements.none { it.row == previous.first && it.column == previous.second }) {
-                    return row to column
-                }
-            }
-        }
-        return firstPlaced.row to firstPlaced.column
     }
 
     private fun crossWordsAreValid(
