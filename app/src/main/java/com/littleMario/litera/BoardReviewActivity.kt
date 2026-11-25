@@ -19,6 +19,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import java.io.DataInputStream
 import java.util.concurrent.Executors
 
 /**
@@ -33,11 +34,14 @@ class BoardReviewActivity : AppCompatActivity() {
     private lateinit var statusText: TextView
     private lateinit var rackInput: EditText
     private lateinit var rackCountText: TextView
+    private lateinit var findMovesButton: Button
+    private lateinit var movesText: TextView
     private lateinit var boardGrid: GridLayout
     private lateinit var photoPreview: ImageView
 
     private var sourceBitmap: Bitmap? = null
     private var currentBoard: BoardState = BoardState.empty()
+    private var cachedDawgNodes: Array<Node>? = null
     private var unresolvedPositions: Set<Pair<Int, Int>> = emptySet()
     private var cellViews: Array<Array<TextView?>> =
         Array(BoardState.SIZE) { arrayOfNulls(BoardState.SIZE) }
@@ -129,6 +133,20 @@ class BoardReviewActivity : AppCompatActivity() {
         }
         content.addView(rackCountText)
         updateRackCounter()
+
+        findMovesButton = Button(this).apply {
+            text = "Szukaj możliwych ruchów"
+            isEnabled = false
+            setOnClickListener { findMoves() }
+        }
+        content.addView(findMovesButton)
+
+        movesText = TextView(this).apply {
+            text = "Wyniki wyszukiwania pojawią się tutaj."
+            textSize = 14f
+            setPadding(0, dp(4), 0, dp(10))
+        }
+        content.addView(movesText)
 
         photoPreview = ImageView(this).apply {
             adjustViewBounds = true
@@ -279,6 +297,66 @@ class BoardReviewActivity : AppCompatActivity() {
         rackCountText.setTextColor(
             if (rack == null) Color.RED else Color.DKGRAY
         )
+        if (::findMovesButton.isInitialized) {
+            findMovesButton.isEnabled = rack != null && rack.size > 0
+        }
+    }
+
+    private fun findMoves() {
+        val rack = LetterRack.parse(rackInput.text.toString())
+        if (rack == null || rack.size == 0) {
+            Toast.makeText(this, "Wpisz od 1 do 7 płytek.", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val boardSnapshot = currentBoard
+        findMovesButton.isEnabled = false
+        movesText.text = "Wyszukiwanie ruchów…"
+        statusText.text = "Analizowanie planszy i stojaka…"
+
+        analysisExecutor.execute {
+            try {
+                val nodes = cachedDawgNodes ?: DawgReader().load(
+                    DataInputStream(assets.open("dictionary.dawg"))
+                ).also { cachedDawgNodes = it }
+
+                val moves = BoardMoveGenerator(nodes).generate(boardSnapshot, rack)
+                runOnUiThread {
+                    if (isFinishing || isDestroyed) return@runOnUiThread
+                    if (moves.isEmpty()) {
+                        movesText.text = "Nie znaleziono legalnych ruchów dla podanego stojaka."
+                    } else {
+                        val shown = moves.take(MAX_DISPLAYED_MOVES)
+                        movesText.text = buildString {
+                            append("Znalezione propozycje: ${moves.size}\n")
+                            append("Kolejność nie uwzględnia jeszcze punktów za pola premiowe.\n\n")
+                            shown.forEachIndexed { index, move ->
+                                val direction = if (move.horizontal) "poziomo" else "pionowo"
+                                val newTiles = move.placements.joinToString(" ") { placed ->
+                                    val mark = if (placed.tile.isBlank) " (blank)" else ""
+                                    "${placed.tile.letter}@${placed.row + 1},${placed.column + 1}$mark"
+                                }
+                                append("${index + 1}. ${move.word.uppercase()} — $direction, ")
+                                append("start ${move.row + 1},${move.column + 1}\n")
+                                append("   Dokładane: $newTiles\n")
+                            }
+                            if (moves.size > shown.size) {
+                                append("\nPokazano pierwsze ${shown.size} propozycji.")
+                            }
+                        }
+                    }
+                    statusText.text = "Wyszukiwanie zakończone."
+                    findMovesButton.isEnabled = true
+                }
+            } catch (error: Exception) {
+                runOnUiThread {
+                    if (isFinishing || isDestroyed) return@runOnUiThread
+                    movesText.text = "Nie udało się wyszukać ruchów: ${error.message ?: "błąd słownika"}"
+                    statusText.text = "Błąd wyszukiwania."
+                    findMovesButton.isEnabled = true
+                }
+            }
+        }
     }
 
     private fun renderBoard() {
@@ -358,6 +436,7 @@ class BoardReviewActivity : AppCompatActivity() {
 
     companion object {
         private const val MAX_IMAGE_SIDE = 2200
+        private const val MAX_DISPLAYED_MOVES = 20
         private const val POLISH_ALPHABET =
             "AĄBCĆDEĘFGHIJKLŁMNŃOÓPRSŚTUWYZŹŻ"
     }
