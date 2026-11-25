@@ -565,6 +565,7 @@ class BoardReviewActivity : AppCompatActivity() {
                     return@setPositiveButton
                 }
                 unresolvedPositions = unresolvedPositions - (row to column)
+                suspectedBlankPositions = suspectedBlankPositions - (row to column)
                 renderBoard()
             }
             .show()
