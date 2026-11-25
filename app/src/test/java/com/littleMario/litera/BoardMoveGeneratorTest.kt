@@ -133,4 +133,87 @@ class BoardMoveGeneratorTest {
                 move.column == 6
         })
     }
+
+    @Test
+    fun canUseExistingTileInMiddleOfGeneratedWord() {
+        val generator = BoardMoveGenerator(dictionary(listOf("kot")))
+        val board = BoardState.empty().withTile(7, 7, BoardTile('O'))
+        val rack = requireNotNull(LetterRack.parse("KT"))
+
+        val moves = generator.generate(board, rack)
+
+        assertTrue(moves.any { move ->
+            move.word == "kot" &&
+                move.horizontal &&
+                move.row == 7 &&
+                move.column == 6 &&
+                move.placements.map { it.row to it.column }.toSet() ==
+                    setOf(7 to 6, 7 to 8)
+        })
+    }
+
+    @Test
+    fun canExtendExistingWordVertically() {
+        val generator = BoardMoveGenerator(dictionary(listOf("kot")))
+        val board = BoardState.empty().withTile(7, 7, BoardTile('K'))
+        val rack = requireNotNull(LetterRack.parse("OT"))
+
+        val moves = generator.generate(board, rack)
+
+        assertTrue(moves.any { move ->
+            move.word == "kot" &&
+                !move.horizontal &&
+                move.row == 7 &&
+                move.column == 7 &&
+                move.placements.size == 2 &&
+                move.placements.any { it.row == 8 && it.column == 7 } &&
+                move.placements.any { it.row == 9 && it.column == 7 }
+        })
+    }
+
+    @Test
+    fun repeatedRackLettersAreUsedOnlyAsManyTimesAsAvailable() {
+        val generator = BoardMoveGenerator(dictionary(listOf("ala")))
+        val rack = requireNotNull(LetterRack.parse("AAL"))
+
+        val moves = generator.generate(BoardState.empty(), rack)
+            .filter { it.word == "ala" }
+
+        assertTrue(moves.isNotEmpty())
+        assertTrue(moves.all { move ->
+            move.placements.size == 3 &&
+                move.placements.count { it.tile.letter == 'A' && !it.tile.isBlank } == 2 &&
+                move.placements.count { it.tile.letter == 'L' && !it.tile.isBlank } == 1
+        })
+    }
+
+    @Test
+    fun supportsTwoBlankTilesInOneMove() {
+        val generator = BoardMoveGenerator(dictionary(listOf("ala")))
+        val rack = requireNotNull(LetterRack.parse("A??"))
+
+        val moves = generator.generate(BoardState.empty(), rack)
+            .filter { it.word == "ala" }
+
+        assertTrue(moves.any { move ->
+            move.placements.size == 3 &&
+                move.placements.count { it.tile.isBlank } == 2
+        })
+    }
+
+    @Test
+    fun doesNotReturnDuplicateMoves() {
+        val generator = BoardMoveGenerator(dictionary(listOf("ala", "ala")))
+        val rack = requireNotNull(LetterRack.parse("AAL"))
+
+        val moves = generator.generate(BoardState.empty(), rack)
+        val keys = moves.map { move ->
+            val blankPattern = move.placements
+                .filter { it.tile.isBlank }
+                .joinToString(",") { "${it.row}:${it.column}" }
+            "${move.horizontal}:${move.row}:${move.column}:${move.word}:$blankPattern"
+        }
+
+        assertEquals(keys.size, keys.toSet().size)
+    }
 }
