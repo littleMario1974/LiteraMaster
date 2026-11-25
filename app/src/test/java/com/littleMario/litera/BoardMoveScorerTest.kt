@@ -158,4 +158,57 @@ class BoardMoveScorerTest {
             LiterakiBoardLayout.premiumCounts()
         )
     }
+
+    @Test
+    fun scoresMultipleVerticalCrossWordsCreatedByOneHorizontalMove() {
+        val board = BoardState.empty()
+            .withTile(6, 6, BoardTile('A'))
+            .withTile(8, 6, BoardTile('E'))
+            .withTile(6, 7, BoardTile('A'))
+            .withTile(8, 7, BoardTile('E'))
+        val move = BoardMove(
+            word = "ko",
+            row = 7,
+            column = 6,
+            horizontal = true,
+            placements = listOf(
+                PlacedTile(7, 6, BoardTile('K')),
+                PlacedTile(7, 7, BoardTile('O'))
+            )
+        )
+
+        val result = BoardMoveScorer { _, _ -> BoardPremium.NONE }.explain(board, move)
+
+        // Główne KO = 3; pionowe AKE = 4 oraz AOE = 3.
+        assertEquals(3, result.mainWordPoints)
+        assertEquals(listOf(4, 3), result.crossWordPoints)
+        assertEquals(10, result.total)
+    }
+
+    @Test
+    fun scoresMultipleHorizontalCrossWordsCreatedByOneVerticalMove() {
+        val board = BoardState.empty()
+            .withTile(6, 6, BoardTile('A'))
+            .withTile(6, 8, BoardTile('E'))
+            .withTile(7, 6, BoardTile('A'))
+            .withTile(7, 8, BoardTile('E'))
+        val move = BoardMove(
+            word = "ko",
+            row = 6,
+            column = 7,
+            horizontal = false,
+            placements = listOf(
+                PlacedTile(6, 7, BoardTile('K')),
+                PlacedTile(7, 7, BoardTile('O'))
+            )
+        )
+
+        val result = BoardMoveScorer { _, _ -> BoardPremium.NONE }.explain(board, move)
+
+        // Główne KO = 3; poziome AKE = 4 oraz AOE = 3.
+        assertEquals(3, result.mainWordPoints)
+        assertEquals(listOf(4, 3), result.crossWordPoints)
+        assertEquals(10, result.total)
+    }
+
 }
