@@ -197,26 +197,39 @@ class BoardMoveGenerator(
         } else {
             startColumn == 7 && 7 in (startRow until (startRow + path.length))
         }
-        val touchesBoard = boardHasTiles &&
-            placements.any { placed ->
-                ORTHOGONAL_NEIGHBORS.any { (dr, dc) ->
-                    val r = placed.row + dr
-                    val c = placed.column + dc
-                    inside(r, c) && board.tileAt(r, c) != null
+        var touchesBoard = false
+        if (boardHasTiles) {
+            for (placed in placements) {
+                val row = placed.row
+                val column = placed.column
+                if ((inside(row - 1, column) && board.tileAt(row - 1, column) != null) ||
+                    (inside(row + 1, column) && board.tileAt(row + 1, column) != null) ||
+                    (inside(row, column - 1) && board.tileAt(row, column - 1) != null) ||
+                    (inside(row, column + 1) && board.tileAt(row, column + 1) != null)
+                ) {
+                    touchesBoard = true
+                    break
                 }
             }
+        }
         if (!boardHasTiles && !coversCenter) return
         if (boardHasTiles && !touchesBoard) return
 
         if (!crossWordsAreValid(board, placements, horizontal)) return
 
-        val blankPattern = placements.filter { it.tile.isBlank }
-            .joinToString(",") { "${it.row}:${it.column}" }
+        // Preserve blank positions in placement order without temporary lists.
+        val blankPattern = StringBuilder()
+        for (placed in placements) {
+            if (!placed.tile.isBlank) continue
+            if (blankPattern.isNotEmpty()) blankPattern.append(',')
+            blankPattern.append(placed.row).append(':').append(placed.column)
+        }
         val key = "${if (horizontal) 'H' else 'V'}:$startRow:$startColumn:$path:$blankPattern"
-        results.putIfAbsent(
-            key,
-            BoardMove(path.toString(), startRow, startColumn, horizontal, placements.toList())
-        )
+        // A move needs a snapshot because placements is reused during recursion.
+        // Avoid creating that snapshot when an equivalent move was already found.
+        if (!results.containsKey(key)) {
+            results[key] = BoardMove(path.toString(), startRow, startColumn, horizontal, placements.toList())
+        }
     }
 
     private fun crossWordsAreValid(
@@ -273,12 +286,6 @@ class BoardMoveGenerator(
 
     private fun inside(row: Int, column: Int): Boolean =
         row in 0 until BoardState.SIZE && column in 0 until BoardState.SIZE
-
-    companion object {
-        private val ORTHOGONAL_NEIGHBORS = listOf(
-            -1 to 0, 1 to 0, 0 to -1, 0 to 1
-        )
-    }
 }
 
 data class BoardMove(
