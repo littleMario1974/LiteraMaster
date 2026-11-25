@@ -336,7 +336,15 @@ class BoardReviewActivity : AppCompatActivity() {
                     return@runOnUiThread
                 }
 
-                sourceBitmap?.recycle()
+                // Keep bitmap replacement ordered with analysis work. An analysis may
+                // already have captured the previous bitmap and be waiting in the
+                // single-thread executor queue; recycling here on the UI thread
+                // could invalidate that pending task before it starts.
+                sourceBitmap?.let { previousBitmap ->
+                    analysisExecutor.execute {
+                        if (!previousBitmap.isRecycled) previousBitmap.recycle()
+                    }
+                }
                 sourceBitmap = decoded
                 currentBoard = BoardState.empty()
                 unresolvedPositions = emptySet()
