@@ -57,7 +57,8 @@ object BoardPhotoAnalysisMapper {
                 val letter = result.letter
 
                 if (letter != null) {
-                    board = board.withTile(row, column, BoardTile(letter, isBlank = result.tileColor == TileColor.WHITE))
+                    // Kolor WHITE jest tylko wskazówką. Blank musi zostać potwierdzony ręcznie.
+                    board = board.withTile(row, column, BoardTile(letter))
                 } else {
                     // Zarówno pusty tekst, jak i niejednoznaczny tekst
                     // pozostawiamy do ewentualnej weryfikacji.
