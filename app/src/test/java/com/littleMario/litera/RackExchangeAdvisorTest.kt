@@ -51,6 +51,20 @@ class RackExchangeAdvisorTest {
     }
 
     @Test
+    fun recommendationIsDeterministicForTheSameSeedAndInput() {
+        val advisor = RackExchangeAdvisor(
+            simulationsPerCandidate = 32,
+            randomSeed = 8128
+        )
+        val rack = LetterRack.parse("ŹŻĄĘĆŃF")!!
+
+        val first = advisor.recommend(BoardState.empty(), rack)
+        val second = advisor.recommend(BoardState.empty(), rack)
+
+        assertEquals(first, second)
+    }
+
+    @Test
     fun recommendationKeepsOrExchangesOnlyLettersFromOriginalRack() {
         val rack = LetterRack.parse("ŹŻĄĘĆŃF")!!
         val advice = RackExchangeAdvisor(simulationsPerCandidate = 24).recommend(
