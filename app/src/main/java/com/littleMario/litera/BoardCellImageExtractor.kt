@@ -77,23 +77,23 @@ class BoardCellImageExtractor(
             val pixels = IntArray(outputCellSize * outputCellSize)
 
             for (y in 0 until outputCellSize) {
-            val vFraction = if (outputCellSize == 1) 0.5
-            else y.toDouble() / (outputCellSize - 1)
-            val v = startV + (endV - startV) * vFraction
+                val vFraction = if (outputCellSize == 1) 0.5
+                else y.toDouble() / (outputCellSize - 1)
+                val v = startV + (endV - startV) * vFraction
 
-            for (x in 0 until outputCellSize) {
-                val uFraction = if (outputCellSize == 1) 0.5
-                else x.toDouble() / (outputCellSize - 1)
-                val u = startU + (endU - startU) * uFraction
+                for (x in 0 until outputCellSize) {
+                    val uFraction = if (outputCellSize == 1) 0.5
+                    else x.toDouble() / (outputCellSize - 1)
+                    val u = startU + (endU - startU) * uFraction
 
-                val point = geometry.pointAt(u, v)
-                val sourceX = point.x.toInt().coerceIn(0, source.width - 1)
-                val sourceY = point.y.toInt().coerceIn(0, source.height - 1)
+                    val point = geometry.pointAt(u, v)
+                    val sourceX = point.x.toInt().coerceIn(0, source.width - 1)
+                    val sourceY = point.y.toInt().coerceIn(0, source.height - 1)
 
-                pixels[y * outputCellSize + x] =
-                    source.getPixel(sourceX, sourceY)
+                    pixels[y * outputCellSize + x] =
+                        source.getPixel(sourceX, sourceY)
+                }
             }
-        }
 
             output.setPixels(
                 pixels,
