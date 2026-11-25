@@ -20,6 +20,18 @@ class BoardMoveGenerator(
     fun generate(board: BoardState, rack: LetterRack): List<BoardMove> {
         if (rack.size == 0) return emptyList()
 
+        // Rack composition is constant for the whole generation pass.
+        // Copy it per start position because recursive search mutates the counters.
+        val initialCounts = IntArray(alphabet.length + 1)
+        rack.letters.forEach { letter ->
+            if (letter == '?') initialCounts[alphabet.length]++
+            else {
+                val index = alphabet.indexOf(letter.lowercaseChar())
+                require(index >= 0) { "Litera $letter nie występuje w alfabecie DAWG." }
+                initialCounts[index]++
+            }
+        }
+        val boardHasTiles = board.occupiedTiles().isNotEmpty()
         val results = linkedMapOf<String, BoardMove>()
         for (horizontal in listOf(true, false)) {
             for (row in 0 until BoardState.SIZE) {
@@ -30,16 +42,7 @@ class BoardMoveGenerator(
                         board.tileAt(previousRow, previousColumn) != null
                     ) continue
 
-                    val counts = IntArray(alphabet.length + 1)
-                    rack.letters.forEach { letter ->
-                        if (letter == '?') {
-                            counts[alphabet.length]++
-                        } else {
-                            val index = alphabet.indexOf(letter.lowercaseChar())
-                            require(index >= 0) { "Litera $letter nie występuje w alfabecie DAWG." }
-                            counts[index]++
-                        }
-                    }
+                    val counts = initialCounts.copyOf()
 
                     search(
                         board = board,
@@ -52,7 +55,8 @@ class BoardMoveGenerator(
                         counts = counts,
                         path = StringBuilder(),
                         placements = mutableListOf(),
-                        results = results
+                        results = results,
+                        boardHasTiles = boardHasTiles
                     )
                 }
             }
@@ -79,7 +83,8 @@ class BoardMoveGenerator(
         counts: IntArray,
         path: StringBuilder,
         placements: MutableList<PlacedTile>,
-        results: MutableMap<String, BoardMove>
+        results: MutableMap<String, BoardMove>,
+        boardHasTiles: Boolean
     ) {
         if (!inside(row, column) || path.length >= BoardState.SIZE) return
 
@@ -94,8 +99,8 @@ class BoardMoveGenerator(
             if (child == -1) return
 
             path.append(alphabet[index])
-            recordIfComplete(board, nextRow, nextColumn, startRow, startColumn, horizontal, child, path, placements, results)
-            search(board, nextRow, nextColumn, startRow, startColumn, horizontal, child, counts, path, placements, results)
+            recordIfComplete(board, nextRow, nextColumn, startRow, startColumn, horizontal, child, path, placements, results, boardHasTiles)
+            search(board, nextRow, nextColumn, startRow, startColumn, horizontal, child, counts, path, placements, results, boardHasTiles)
             path.deleteCharAt(path.length - 1)
             return
         }
@@ -122,8 +127,8 @@ class BoardMoveGenerator(
                     )
                 )
 
-                recordIfComplete(board, nextRow, nextColumn, startRow, startColumn, horizontal, child, path, placements, results)
-                search(board, nextRow, nextColumn, startRow, startColumn, horizontal, child, counts, path, placements, results)
+                recordIfComplete(board, nextRow, nextColumn, startRow, startColumn, horizontal, child, path, placements, results, boardHasTiles)
+                search(board, nextRow, nextColumn, startRow, startColumn, horizontal, child, counts, path, placements, results, boardHasTiles)
 
                 placements.removeAt(placements.lastIndex)
                 path.deleteCharAt(path.length - 1)
@@ -142,7 +147,8 @@ class BoardMoveGenerator(
         nodeId: Int,
         path: StringBuilder,
         placements: List<PlacedTile>,
-        results: MutableMap<String, BoardMove>
+        results: MutableMap<String, BoardMove>,
+        boardHasTiles: Boolean
     ) {
         if (!nodes[nodeId].terminal || placements.isEmpty()) return
         if (inside(nextRow, nextColumn) && board.tileAt(nextRow, nextColumn) != null) return
@@ -152,7 +158,7 @@ class BoardMoveGenerator(
         } else {
             startColumn == 7 && 7 in (startRow until (startRow + path.length))
         }
-        val touchesBoard = board.occupiedTiles().isNotEmpty() &&
+        val touchesBoard = boardHasTiles &&
             placements.any { placed ->
                 ORTHOGONAL_NEIGHBORS.any { (dr, dc) ->
                     val r = placed.row + dr
@@ -160,8 +166,8 @@ class BoardMoveGenerator(
                     inside(r, c) && board.tileAt(r, c) != null
                 }
             }
-        if (board.occupiedTiles().isEmpty() && !coversCenter) return
-        if (board.occupiedTiles().isNotEmpty() && !touchesBoard) return
+        if (!boardHasTiles && !coversCenter) return
+        if (boardHasTiles && !touchesBoard) return
 
         if (!crossWordsAreValid(board, placements, horizontal)) return
 
