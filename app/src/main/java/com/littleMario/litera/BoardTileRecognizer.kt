@@ -97,26 +97,43 @@ class BoardTileRecognizer {
      */
     private fun recognizeTileColorFromCorners(bitmap: Bitmap): TileColor? {
         if (bitmap.width < 8 || bitmap.height < 8) return null
-        val pixels = mutableListOf<Int>()
         val patchWidth = (bitmap.width * 0.12f).toInt().coerceAtLeast(2)
         val patchHeight = (bitmap.height * 0.12f).toInt().coerceAtLeast(2)
         val left = (bitmap.width * 0.18f).toInt()
         val right = (bitmap.width * 0.70f).toInt()
         val top = (bitmap.height * 0.18f).toInt()
         val bottom = (bitmap.height * 0.70f).toInt()
-        for (startY in listOf(top, bottom)) {
-            for (startX in listOf(left, right)) {
-                for (y in startY until (startY + patchHeight).coerceAtMost(bitmap.height)) {
-                    for (x in startX until (startX + patchWidth).coerceAtMost(bitmap.width)) {
-                        pixels += bitmap.getPixel(x, y)
+
+        // Accumulate channels directly instead of allocating a boxed pixel list
+        // and three intermediate lists for every one of the 225 board cells.
+        var redSum = 0L
+        var greenSum = 0L
+        var blueSum = 0L
+        var pixelCount = 0L
+
+        for (vertical in 0..1) {
+            val startY = if (vertical == 0) top else bottom
+            for (horizontal in 0..1) {
+                val startX = if (horizontal == 0) left else right
+                val endY = (startY + patchHeight).coerceAtMost(bitmap.height)
+                val endX = (startX + patchWidth).coerceAtMost(bitmap.width)
+
+                for (y in startY until endY) {
+                    for (x in startX until endX) {
+                        val pixel = bitmap.getPixel(x, y)
+                        redSum += android.graphics.Color.red(pixel)
+                        greenSum += android.graphics.Color.green(pixel)
+                        blueSum += android.graphics.Color.blue(pixel)
+                        pixelCount++
                     }
                 }
             }
         }
-        if (pixels.isEmpty()) return null
-        val red = pixels.map { android.graphics.Color.red(it) }.average().toInt()
-        val green = pixels.map { android.graphics.Color.green(it) }.average().toInt()
-        val blue = pixels.map { android.graphics.Color.blue(it) }.average().toInt()
+
+        if (pixelCount == 0L) return null
+        val red = (redSum / pixelCount).toInt()
+        val green = (greenSum / pixelCount).toInt()
+        val blue = (blueSum / pixelCount).toInt()
         return BoardTileColorClassifier.classify(red, green, blue)
     }
 
