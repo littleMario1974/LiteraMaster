@@ -44,6 +44,39 @@ class BoardPhotoAnalysisMapperTest {
         assertEquals(0, analysis.recognizedTileCount)
     }
 
+    @Test(expected = IllegalArgumentException::class)
+    fun rejectsResultsWhenBoardDoesNotHave225Cells() {
+        BoardPhotoAnalysisMapper.map(geometry, emptyResults().dropLast(1))
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun rejectsDuplicateCellCoordinates() {
+        val results = emptyResults().toMutableList()
+        results[1] = results[1].copy(row = 0, column = 0)
+
+        BoardPhotoAnalysisMapper.map(geometry, results)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun rejectsCoordinatesOutsideBoard() {
+        val results = emptyResults().toMutableList()
+        results[0] = results[0].copy(row = BoardState.SIZE, column = 0)
+
+        BoardPhotoAnalysisMapper.map(geometry, results)
+    }
+
+    @Test
+    fun returnsCellResultsInBoardReadingOrder() {
+        val results = emptyResults().reversed()
+
+        val analysis = BoardPhotoAnalysisMapper.map(geometry, results)
+
+        assertEquals(0, analysis.cellResults.first().row)
+        assertEquals(0, analysis.cellResults.first().column)
+        assertEquals(BoardState.SIZE - 1, analysis.cellResults.last().row)
+        assertEquals(BoardState.SIZE - 1, analysis.cellResults.last().column)
+    }
+
     @Test
     fun whiteRecognizedTileRemainsOrdinaryUntilBlankIsConfirmedManually() {
         val results = emptyResults().toMutableList()
