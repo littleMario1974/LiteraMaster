@@ -71,11 +71,17 @@ class BoardImageDetector(
             Imgproc.cvtColor(rgba, gray, Imgproc.COLOR_RGBA2GRAY)
             Imgproc.GaussianBlur(gray, blurred, Size(5.0, 5.0), 0.0)
             Imgproc.Canny(blurred, edges, 50.0, 150.0)
-            Imgproc.dilate(
-                edges,
-                edges,
-                Imgproc.getStructuringElement(Imgproc.MORPH_RECT, Size(3.0, 3.0))
+            // getStructuringElement allocates a native OpenCV Mat.
+            // Release it explicitly after dilate, including exceptional paths.
+            val dilationKernel = Imgproc.getStructuringElement(
+                Imgproc.MORPH_RECT,
+                Size(3.0, 3.0)
             )
+            try {
+                Imgproc.dilate(edges, edges, dilationKernel)
+            } finally {
+                dilationKernel.release()
+            }
 
             Imgproc.findContours(
                 edges,
