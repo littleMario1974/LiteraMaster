@@ -40,7 +40,9 @@ class BoardReviewActivity : AppCompatActivity() {
     private lateinit var previousMoveButton: Button
     private lateinit var nextMoveButton: Button
     private lateinit var previewMoveLabel: TextView
+    private lateinit var previewDetailsText: TextView
     private var previewMoves: List<BoardMove> = emptyList()
+    private var previewBreakdowns: List<ScoreBreakdown> = emptyList()
     private var selectedMoveIndex: Int? = null
     private var selectedMove: BoardMove? = null
     private lateinit var boardGrid: GridLayout
@@ -186,6 +188,11 @@ class BoardReviewActivity : AppCompatActivity() {
         previewNavigation.addView(nextMoveButton,
             LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         movesActionsContainer.addView(previewNavigation)
+        previewDetailsText = TextView(this).apply {
+            textSize = 14f
+            setPadding(dp(8), dp(4), dp(8), dp(8))
+        }
+        movesActionsContainer.addView(previewDetailsText)
         movesActionsContainer.addView(Button(this).apply {
             text = "Usuń podgląd ruchu"
             setOnClickListener { clearMovePreview() }
@@ -355,6 +362,7 @@ class BoardReviewActivity : AppCompatActivity() {
 
         val boardSnapshot = currentBoard
         previewMoves = emptyList()
+        previewBreakdowns = emptyList()
         selectedMoveIndex = null
         selectedMove = null
         movesActionsContainer.visibility = View.GONE
@@ -385,6 +393,7 @@ class BoardReviewActivity : AppCompatActivity() {
                     } else {
                         val shown = rankedMoves.take(MAX_DISPLAYED_MOVES)
                         previewMoves = shown.map { it.first }
+                        previewBreakdowns = shown.map { it.second }
                         selectedMoveIndex = null
                         selectedMove = null
                         movesActionsContainer.visibility = View.VISIBLE
@@ -431,12 +440,49 @@ class BoardReviewActivity : AppCompatActivity() {
         updatePreviewNavigation()
         renderBoard()
         val move = previewMoves[index]
-        statusText.text = "Podgląd ruchu ${'
+        val breakdown = previewBreakdowns[index]
+        val direction = if (move.horizontal) "poziomo" else "pionowo"
+        val newTiles = move.placements.joinToString(" ") { placed ->
+            val blankMark = if (placed.tile.isBlank) " (blank)" else ""
+            "${placed.tile.letter}@${placed.row + 1},${placed.column + 1}${blankMark}"
+        }
+        previewDetailsText.text = buildString {
+            append("${move.word.uppercase()} — ${breakdown.total} pkt\n")
+            append("Kierunek: ${direction}; początek: wiersz ${move.row + 1}, kolumna ${move.column + 1}\n")
+            append("Dokładane płytki: ${newTiles}\n")
+            breakdown.details.forEach { detail -> append("• ${detail}\n") }
+        }
+        statusText.text = "Podgląd ruchu ${index + 1}/${previewMoves.size}: ${move.word.uppercase()}"
+    }
+
+    private fun clearMovePreview() {
+        selectedMoveIndex = null
+        selectedMove = null
+        previewDetailsText.text = "Wybierz ruch, aby zobaczyć jego szczegóły."
+        updatePreviewNavigation()
+        renderBoard()
+        statusText.text = "Podgląd ruchu wyłączony."
+    }
+
+    private fun updatePreviewNavigation() {
+        val index = selectedMoveIndex
+        previewMoveLabel.text = if (index == null) {
+            "Wybierz ruch"
+        } else {
+            "${index + 1}/${previewMoves.size}\n${previewMoves[index].word.uppercase()}"
+        }
+        previousMoveButton.isEnabled = index != null && index > 0
+        nextMoveButton.isEnabled = index != null && index < previewMoves.lastIndex
+    }
+
+    private fun renderBoard() {
         for (row in 0 until BoardState.SIZE) {
             for (column in 0 until BoardState.SIZE) {
                 val view = cellViews[row][column] ?: continue
                 val tile = currentBoard.tileAt(row, column)
-                val previewTile = selectedMove?.placements?.firstOrNull { it.row == row && it.column == column }?.tile
+                val previewTile = selectedMove?.placements?.firstOrNull {
+                    it.row == row && it.column == column
+                }?.tile
                 val displayedTile = previewTile ?: tile
                 view.text = displayedTile?.letter?.uppercaseChar()?.toString() ?: ""
                 val unresolved = (row to column) in unresolvedPositions
