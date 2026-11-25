@@ -32,12 +32,20 @@ class BoardCellImageExtractor(
     ): List<Bitmap> {
         require(!source.isRecycled) { "Obraz źródłowy został zwolniony." }
 
-        return buildList(BoardState.SIZE * BoardState.SIZE) {
+        val cells = ArrayList<Bitmap>(BoardState.SIZE * BoardState.SIZE)
+        try {
             for (row in 0 until BoardState.SIZE) {
                 for (column in 0 until BoardState.SIZE) {
-                    add(extractCell(source, geometry, row, column))
+                    cells.add(extractCell(source, geometry, row, column))
                 }
             }
+            return cells
+        } catch (exception: Exception) {
+            // If extraction fails midway, release every bitmap already created.
+            cells.forEach { bitmap ->
+                if (!bitmap.isRecycled) bitmap.recycle()
+            }
+            throw exception
         }
     }
 
@@ -65,9 +73,10 @@ class BoardCellImageExtractor(
             Bitmap.Config.ARGB_8888
         )
 
-        val pixels = IntArray(outputCellSize * outputCellSize)
+        try {
+            val pixels = IntArray(outputCellSize * outputCellSize)
 
-        for (y in 0 until outputCellSize) {
+            for (y in 0 until outputCellSize) {
             val vFraction = if (outputCellSize == 1) 0.5
             else y.toDouble() / (outputCellSize - 1)
             val v = startV + (endV - startV) * vFraction
@@ -86,16 +95,21 @@ class BoardCellImageExtractor(
             }
         }
 
-        output.setPixels(
-            pixels,
-            0,
-            outputCellSize,
-            0,
-            0,
-            outputCellSize,
-            outputCellSize
-        )
-        return output
+            output.setPixels(
+                pixels,
+                0,
+                outputCellSize,
+                0,
+                0,
+                outputCellSize,
+                outputCellSize
+            )
+            return output
+        } catch (exception: Exception) {
+            // Do not leave a native bitmap allocated if sampling or setPixels fails.
+            output.recycle()
+            throw exception
+        }
     }
 
     companion object {
