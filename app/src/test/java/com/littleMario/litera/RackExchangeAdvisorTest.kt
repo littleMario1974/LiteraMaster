@@ -30,7 +30,7 @@ class RackExchangeAdvisorTest {
     fun doesNotRecommendExchangeAfterThreeExchanges() {
         val advice = RackExchangeAdvisor(simulationsPerCandidate = 8).recommend(
             board = BoardState.empty(),
-            rack = LetterRack.parse("ŹŹŹĄĘĆF")!!,
+            rack = LetterRack.parse("ŹŻĄĘĆŃF")!!,
             exchangesUsed = 3
         )
 
@@ -52,7 +52,7 @@ class RackExchangeAdvisorTest {
 
     @Test
     fun recommendationKeepsOrExchangesOnlyLettersFromOriginalRack() {
-        val rack = LetterRack.parse("ŹŹŹĄĘĆF")!!
+        val rack = LetterRack.parse("ŹŻĄĘĆŃF")!!
         val advice = RackExchangeAdvisor(simulationsPerCandidate = 24).recommend(
             board = BoardState.empty(),
             rack = rack
