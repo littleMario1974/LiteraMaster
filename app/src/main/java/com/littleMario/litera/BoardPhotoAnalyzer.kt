@@ -70,11 +70,13 @@ class BoardPhotoAnalyzer(
                     recycleCells(cellBitmaps)
                     recognizer.close()
 
-                    try {
-                        onSuccess(BoardPhotoAnalysisMapper.map(geometry, results))
+                    val analysis = try {
+                        BoardPhotoAnalysisMapper.map(geometry, results)
                     } catch (exception: Exception) {
                         onError(BoardPhotoAnalysisException.InvalidOcrResults(exception))
+                        return@recognizeBoard
                     }
+                    onSuccess(analysis)
                 },
                 onError = ::finishWithError
             )
