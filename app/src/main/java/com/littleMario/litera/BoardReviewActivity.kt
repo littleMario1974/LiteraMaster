@@ -287,9 +287,7 @@ class BoardReviewActivity : AppCompatActivity() {
 
     private fun calculateSampleSize(width: Int, height: Int, maxSide: Int): Int {
         var sample = 1
-        while (width / (sample * 2) >= maxSide &&
-            height / (sample * 2) >= maxSide
-        ) {
+        while (maxOf(width / (sample * 2), height / (sample * 2)) >= maxSide) {
             sample *= 2
         }
         return sample
