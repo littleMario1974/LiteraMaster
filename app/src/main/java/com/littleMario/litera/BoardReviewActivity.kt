@@ -322,9 +322,9 @@ class BoardReviewActivity : AppCompatActivity() {
 
                 val scorer = BoardMoveScorer()
                 val rankedMoves = BoardMoveGenerator(nodes).generate(boardSnapshot, rack)
-                    .map { move -> move to scorer.score(boardSnapshot, move) }
+                    .map { move -> move to scorer.explain(boardSnapshot, move) }
                     .sortedWith(
-                        compareByDescending<Pair<BoardMove, Int>> { it.second }
+                        compareByDescending<Pair<BoardMove, ScoreBreakdown>> { it.second.total }
                             .thenByDescending { it.first.placements.size }
                             .thenBy { it.first.word }
                     )
@@ -337,14 +337,17 @@ class BoardReviewActivity : AppCompatActivity() {
                         movesText.text = buildString {
                             append("Znalezione propozycje: ${rankedMoves.size}\n")
                             append("Ranking według punktów (premie Literaków uwzględnione).\n\n")
-                            shown.forEachIndexed { index, (move, points) ->
+                            shown.forEachIndexed { index, (move, breakdown) ->
                                 val direction = if (move.horizontal) "poziomo" else "pionowo"
                                 val newTiles = move.placements.joinToString(" ") { placed ->
                                     val mark = if (placed.tile.isBlank) " (blank)" else ""
                                     "${placed.tile.letter}@${placed.row + 1},${placed.column + 1}$mark"
                                 }
-                                append("${index + 1}. ${move.word.uppercase()} — $points pkt — $direction, ")
+                                append("${index + 1}. ${move.word.uppercase()} — ${breakdown.total} pkt — $direction, ")
                                 append("start ${move.row + 1},${move.column + 1}\n")
+                                breakdown.details.forEach { detail ->
+                                    append("   $detail\\n")
+                                }
                                 append("   Dokładane: $newTiles\n")
                             }
                             if (rankedMoves.size > shown.size) {
