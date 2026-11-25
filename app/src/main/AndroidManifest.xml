@@ -27,6 +27,10 @@
             android:value="ca-app-pub-5464929398169318~8033830580"/>
 
         <activity
+            android:name=".BoardReviewActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".MainActivity"
             android:exported="true">
             <intent-filter>
