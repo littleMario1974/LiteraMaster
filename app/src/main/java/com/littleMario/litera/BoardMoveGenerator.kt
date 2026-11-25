@@ -165,7 +165,9 @@ class BoardMoveGenerator(
 
         if (!crossWordsAreValid(board, placements, horizontal)) return
 
-        val key = "${if (horizontal) 'H' else 'V'}:$startRow:$startColumn:$path"
+        val blankPattern = placements.filter { it.tile.isBlank }
+            .joinToString(",") { "${it.row}:${it.column}" }
+        val key = "${if (horizontal) 'H' else 'V'}:$startRow:$startColumn:$path:$blankPattern"
         results.putIfAbsent(
             key,
             BoardMove(path.toString(), startRow, startColumn, horizontal, placements.toList())
