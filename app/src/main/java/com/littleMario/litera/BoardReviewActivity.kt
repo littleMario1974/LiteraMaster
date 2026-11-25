@@ -31,6 +31,8 @@ class BoardReviewActivity : AppCompatActivity() {
     private lateinit var choosePhotoButton: Button
     private lateinit var analyzeButton: Button
     private lateinit var statusText: TextView
+    private lateinit var rackInput: EditText
+    private lateinit var rackCountText: TextView
     private lateinit var boardGrid: GridLayout
     private lateinit var photoPreview: ImageView
 
@@ -88,6 +90,45 @@ class BoardReviewActivity : AppCompatActivity() {
             setPadding(0, dp(8), 0, dp(8))
         }
         content.addView(statusText)
+
+        content.addView(TextView(this).apply {
+            text = "Twoje litery na stojaku (maks. 7, ? = blank)"
+            textSize = 16f
+            setTypeface(null, Typeface.BOLD)
+            setPadding(0, dp(8), 0, dp(4))
+        })
+
+        rackInput = EditText(this).apply {
+            hint = "np. AĄKOTR?"
+            isSingleLine = true
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or
+                android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS or
+                android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+            filters = arrayOf(
+                android.text.InputFilter.LengthFilter(LetterRack.MAX_TILES)
+            )
+            addTextChangedListener(object : android.text.TextWatcher {
+                override fun beforeTextChanged(
+                    s: CharSequence?, start: Int, count: Int, after: Int
+                ) = Unit
+
+                override fun onTextChanged(
+                    s: CharSequence?, start: Int, before: Int, count: Int
+                ) {
+                    updateRackCounter()
+                }
+
+                override fun afterTextChanged(s: android.text.Editable?) = Unit
+            })
+        }
+        content.addView(rackInput)
+
+        rackCountText = TextView(this).apply {
+            textSize = 13f
+            setPadding(0, 0, 0, dp(6))
+        }
+        content.addView(rackCountText)
+        updateRackCounter()
 
         photoPreview = ImageView(this).apply {
             adjustViewBounds = true
@@ -226,6 +267,18 @@ class BoardReviewActivity : AppCompatActivity() {
                 }
             )
         }
+    }
+
+    private fun updateRackCounter() {
+        val rack = LetterRack.parse(rackInput.text.toString())
+        rackCountText.text = if (rack == null) {
+            "Nieprawidłowy stojak — użyj liter polskiego alfabetu i maksymalnie 7 znaków."
+        } else {
+            "Płytek: ${rack.size}/${LetterRack.MAX_TILES}   Blanki: ${rack.blankCount}"
+        }
+        rackCountText.setTextColor(
+            if (rack == null) Color.RED else Color.DKGRAY
+        )
     }
 
     private fun renderBoard() {
