@@ -145,9 +145,9 @@ class BoardMoveGenerator(
         if (inside(nextRow, nextColumn) && board.tileAt(nextRow, nextColumn) != null) return
 
         val coversCenter = if (horizontal) {
-            startRow == 7 && 7 in startColumn until (startColumn + path.length)
+            startRow == 7 && 7 in (startColumn until (startColumn + path.length))
         } else {
-            startColumn == 7 && 7 in startRow until (startRow + path.length)
+            startColumn == 7 && 7 in (startRow until (startRow + path.length))
         }
         val touchesBoard = board.occupiedTiles().isNotEmpty() &&
             placements.any { placed ->
