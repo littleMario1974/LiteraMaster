@@ -55,6 +55,7 @@ class BoardReviewActivity : AppCompatActivity() {
     private var cachedDawgNodes: Array<Node>? = null
     private var unresolvedPositions: Set<Pair<Int, Int>> = emptySet()
     private var suspectedBlankPositions: Set<Pair<Int, Int>> = emptySet()
+    private var lowConfidencePositions: Set<Pair<Int, Int>> = emptySet()
     private var recognizedTileColors: Map<Pair<Int, Int>, TileColor?> = emptyMap()
     private var cellViews: Array<Array<TextView?>> =
         Array(BoardState.SIZE) { arrayOfNulls(BoardState.SIZE) }
@@ -306,6 +307,7 @@ class BoardReviewActivity : AppCompatActivity() {
                 currentBoard = BoardState.empty()
                 unresolvedPositions = emptySet()
                 suspectedBlankPositions = emptySet()
+                lowConfidencePositions = emptySet()
                 recognizedTileColors = emptyMap()
                 colorDiagnosticsText.text = "Diagnostyka kolorów pojawi się po analizie zdjęcia."
                 renderBoard()
@@ -334,6 +336,8 @@ class BoardReviewActivity : AppCompatActivity() {
                             .map { it.row to it.column }.toSet()
                         val colorDiagnostics = BoardTileColorDiagnostics.from(analysis.cellResults)
                         suspectedBlankPositions = colorDiagnostics.suspectedBlankPositions
+                        lowConfidencePositions = BoardOcrConfidenceReview
+                            .lowConfidencePositions(analysis.cellResults)
                         recognizedTileColors = analysis.cellResults
                             .filter { it.letter != null }
                             .associate { (it.row to it.column) to it.tileColor }
@@ -346,6 +350,7 @@ class BoardReviewActivity : AppCompatActivity() {
                             "Potwierdzone blanki: ${detectedBlanks}. " +
                             "Białe płytki do sprawdzenia: ${suspectedBlankPositions.size}. " +
                             "Pola wymagające korekty OCR: ${analysis.unresolvedCount}. " +
+                            "Litery o niskiej pewności: ${lowConfidencePositions.size}. " +
                             "Dotknij oznaczonej płytki i zaznacz blank, jeśli to biała płytka."
                         choosePhotoButton.isEnabled = true
                         analyzeButton.isEnabled = true
@@ -515,6 +520,7 @@ class BoardReviewActivity : AppCompatActivity() {
                     tile.letter.uppercaseChar().toString() + when {
                         tile.isBlank -> "*"
                         suspectedBlank && previewTile == null -> "?"
+                        position in lowConfidencePositions && previewTile == null -> "!"
                         else -> ""
                     }
                 } ?: ""
@@ -524,6 +530,7 @@ class BoardReviewActivity : AppCompatActivity() {
                         previewTile != null -> Color.rgb(255, 170, 70)
                         unresolved -> Color.rgb(255, 224, 130)
                         suspectedBlank -> Color.rgb(220, 210, 255)
+                        position in lowConfidencePositions -> Color.rgb(255, 205, 160)
                         tile != null -> Color.rgb(255, 255, 255)
                         else -> Color.rgb(225, 235, 240)
                     }
@@ -569,6 +576,7 @@ class BoardReviewActivity : AppCompatActivity() {
                 currentBoard = currentBoard.withTile(row, column, null)
                 unresolvedPositions = unresolvedPositions - (row to column)
                 suspectedBlankPositions = suspectedBlankPositions - (row to column)
+                lowConfidencePositions = lowConfidencePositions - (row to column)
                 renderBoard()
             }
             .setPositiveButton("Zapisz") { _, _ ->
