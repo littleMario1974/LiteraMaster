@@ -21,7 +21,8 @@ class BoardMoveGenerator(
         if (rack.size == 0) return emptyList()
 
         // Rack composition is constant for the whole generation pass.
-        // Copy it per start position because recursive search mutates the counters.
+        // Reuse one counter array and restore its initial contents before each
+        // start position instead of allocating a fresh array hundreds of times.
         val initialCounts = IntArray(alphabet.length + 1)
         rack.letters.forEach { letter ->
             if (letter == '?') initialCounts[alphabet.length]++
@@ -33,6 +34,7 @@ class BoardMoveGenerator(
         }
         // Avoid building a PlacedTile list just to test whether the board is empty.
         val boardHasTiles = board.hasTiles()
+        val counts = IntArray(initialCounts.size)
         val results = linkedMapOf<String, BoardMove>()
         for (horizontal in listOf(true, false)) {
             for (row in 0 until BoardState.SIZE) {
@@ -43,7 +45,7 @@ class BoardMoveGenerator(
                         board.tileAt(previousRow, previousColumn) != null
                     ) continue
 
-                    val counts = initialCounts.copyOf()
+                    initialCounts.copyInto(counts)
 
                     search(
                         board = board,
