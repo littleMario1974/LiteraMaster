@@ -743,8 +743,16 @@ class BoardReviewActivity : AppCompatActivity() {
         (value * resources.displayMetrics.density).toInt()
 
     override fun onDestroy() {
-        sourceBitmap?.recycle()
+        // The detector and cell extractor use the source bitmap synchronously
+        // on analysisExecutor. Queue recycling behind any pending analysis so
+        // the bitmap cannot be recycled while OpenCV is still reading it.
+        val bitmapToRecycle = sourceBitmap
         sourceBitmap = null
+        analysisExecutor.execute {
+            bitmapToRecycle?.let { bitmap ->
+                if (!bitmap.isRecycled) bitmap.recycle()
+            }
+        }
         analysisExecutor.shutdown()
         super.onDestroy()
     }
