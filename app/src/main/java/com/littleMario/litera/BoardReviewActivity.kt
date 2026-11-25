@@ -10,6 +10,7 @@ import android.os.Bundle
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
+import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.GridLayout
 import android.widget.ImageView
@@ -484,7 +485,9 @@ class BoardReviewActivity : AppCompatActivity() {
                     it.row == row && it.column == column
                 }?.tile
                 val displayedTile = previewTile ?: tile
-                view.text = displayedTile?.letter?.uppercaseChar()?.toString() ?: ""
+                view.text = displayedTile?.let { tile ->
+                    tile.letter.uppercaseChar().toString() + if (tile.isBlank) "*" else ""
+                } ?: ""
                 val unresolved = (row to column) in unresolvedPositions
                 view.setBackgroundColor(
                     when {
@@ -501,18 +504,29 @@ class BoardReviewActivity : AppCompatActivity() {
 
     private fun editCell(row: Int, column: Int) {
         clearMovePreview()
+        val existingTile = currentBoard.tileAt(row, column)
         val input = EditText(this).apply {
-            hint = "Litera lub puste pole"
+            hint = "Litera przypisana do płytki"
             filters = arrayOf(android.text.InputFilter.LengthFilter(1))
             setSingleLine(true)
-            setText(currentBoard.tileAt(row, column)?.letter?.toString() ?: "")
+            setText(existingTile?.letter?.toString() ?: "")
             setSelection(text.length)
+        }
+        val blankCheckbox = CheckBox(this).apply {
+            text = "To jest blank (biała płytka)"
+            isChecked = existingTile?.isBlank == true
+        }
+        val editor = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(4), dp(20), 0)
+            addView(input)
+            addView(blankCheckbox)
         }
 
         AlertDialog.Builder(this)
             .setTitle("Pole ${row + 1}, ${column + 1}")
-            .setMessage("Wpisz jedną literę polskiego alfabetu albo usuń zawartość.")
-            .setView(input)
+            .setMessage("Wpisz literę, którą zastępuje płytka. Blank na planszy również ma przypisaną literę.")
+            .setView(editor)
             .setNegativeButton("Anuluj", null)
             .setNeutralButton("Wyczyść") { _, _ ->
                 currentBoard = currentBoard.withTile(row, column, null)
@@ -521,10 +535,10 @@ class BoardReviewActivity : AppCompatActivity() {
             }
             .setPositiveButton("Zapisz") { _, _ ->
                 val value = input.text.toString().trim().uppercase()
-                if (value.isEmpty()) {
-                    currentBoard = currentBoard.withTile(row, column, null)
-                } else if (value.length == 1 && value[0] in POLISH_ALPHABET) {
-                    currentBoard = currentBoard.withTile(row, column, BoardTile(value[0]))
+                if (value.length == 1 && value[0] in POLISH_ALPHABET) {
+                    currentBoard = currentBoard.withTile(
+                        row, column, BoardTile(value[0], isBlank = blankCheckbox.isChecked)
+                    )
                 } else {
                     Toast.makeText(
                         this, "Wpisz jedną literę polskiego alfabetu.",
