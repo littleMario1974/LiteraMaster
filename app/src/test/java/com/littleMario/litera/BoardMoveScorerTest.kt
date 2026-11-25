@@ -92,6 +92,24 @@ class BoardMoveScorerTest {
     }
 
     @Test
+    fun previouslyOccupiedWordPremiumDoesNotMultiplyNewWordAgain() {
+        val board = BoardState.empty().withTile(2, 0, BoardTile('K'))
+        val move = BoardMove(
+            word = "kot",
+            row = 2,
+            column = 0,
+            horizontal = true,
+            placements = listOf(
+                PlacedTile(2, 1, BoardTile('O')),
+                PlacedTile(2, 2, BoardTile('T'))
+            )
+        )
+
+        // K leży już na polu 3X (3,1), więc premia słowna nie aktywuje się ponownie.
+        assertEquals(5, BoardMoveScorer().score(board, move))
+    }
+
+    @Test
     fun addsFiftyPointBonusForSevenNewTiles() {
         val board = BoardState.empty()
         val word = "abcdefg"
