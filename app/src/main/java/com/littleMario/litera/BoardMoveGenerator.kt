@@ -105,27 +105,30 @@ class BoardMoveGenerator(
             val child = node.next[index]
             if (child == -1) continue
 
-            val usesBlank = counts[index] == 0
-            val countIndex = if (usesBlank) alphabet.length else index
-            if (counts[countIndex] == 0) continue
+            val availableSources = buildList {
+                if (counts[index] > 0) add(index to false)
+                if (counts[alphabet.length] > 0) add(alphabet.length to true)
+            }
 
-            counts[countIndex]--
-            val letter = alphabet[index]
-            path.append(letter)
-            placements.add(
-                PlacedTile(
-                    row,
-                    column,
-                    BoardTile(letter.uppercaseChar(), isBlank = usesBlank)
+            for ((countIndex, usesBlank) in availableSources) {
+                counts[countIndex]--
+                val letter = alphabet[index]
+                path.append(letter)
+                placements.add(
+                    PlacedTile(
+                        row,
+                        column,
+                        BoardTile(letter.uppercaseChar(), isBlank = usesBlank)
+                    )
                 )
-            )
 
-            recordIfComplete(board, nextRow, nextColumn, startRow, startColumn, horizontal, child, path, placements, results)
-            search(board, nextRow, nextColumn, startRow, startColumn, horizontal, child, counts, path, placements, results)
+                recordIfComplete(board, nextRow, nextColumn, startRow, startColumn, horizontal, child, path, placements, results)
+                search(board, nextRow, nextColumn, startRow, startColumn, horizontal, child, counts, path, placements, results)
 
-            placements.removeAt(placements.lastIndex)
-            path.deleteCharAt(path.length - 1)
-            counts[countIndex]++
+                placements.removeAt(placements.lastIndex)
+                path.deleteCharAt(path.length - 1)
+                counts[countIndex]++
+            }
         }
     }
 
