@@ -580,8 +580,8 @@ class BoardReviewActivity : AppCompatActivity() {
             "\nBrak rozpoznanego koloru dla tego pola."
         }
         val confidenceDescription = detectedConfidence?.let {
-            "\\nPewność OCR: ${"%.0f".format(it * 100)}%."
-        } ?: "\\nBrak danych o pewności OCR."
+            "\nPewność OCR: ${"%.0f".format(it * 100)}%."
+        } ?: "\nBrak danych o pewności OCR."
         AlertDialog.Builder(this)
             .setTitle("Pole ${row + 1}, ${column + 1}")
             .setMessage("Wpisz literę, którą zastępuje płytka. Blank na planszy również ma przypisaną literę.$colorDescription$confidenceDescription")
