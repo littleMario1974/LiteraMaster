@@ -150,36 +150,43 @@ object LiterakiBoardLayout {
  * Liczy punkty za ruch. Premie dotyczą wyłącznie nowo dokładanych płytek.
  * Zajęte wcześniej pola nie aktywują premii ponownie.
  */
+data class ScoreBreakdown(
+    val total: Int,
+    val mainWordPoints: Int,
+    val crossWordPoints: List<Int>,
+    val sevenTileBonus: Int,
+    val details: List<String>
+)
+
 class BoardMoveScorer(
     private val premiumAt: (row: Int, column: Int) -> BoardPremium =
         LiterakiBoardLayout::premiumAt
 ) {
-    fun score(board: BoardState, move: BoardMove): Int {
-        require(move.placements.isNotEmpty()) { "Ruch nie zawiera nowych płytek." }
+    fun score(board: BoardState, move: BoardMove): Int = explain(board, move).total
 
+    /** Szczegółowy wynik: słowo główne, słowa poprzeczne i bonus za 7 płytek. */
+    fun explain(board: BoardState, move: BoardMove): ScoreBreakdown {
+        require(move.placements.isNotEmpty()) { "Ruch nie zawiera nowych płytek." }
         val newTiles = move.placements.associateBy { it.row to it.column }
         val mainCoordinates = move.word.indices.map { index ->
             val row = move.row + if (move.horizontal) 0 else index
             val column = move.column + if (move.horizontal) index else 0
             row to column
         }
-
-        var total = scoreWord(board, mainCoordinates, newTiles)
-
-        // Każde słowo poprzeczne utworzone ruchem jest punktowane osobno.
+        val mainPoints = scoreWord(board, mainCoordinates, newTiles)
+        val crossPoints = mutableListOf<Int>()
         for (placed in move.placements) {
             val coordinates = collectCrossWord(board, placed, newTiles, move.horizontal)
-            if (coordinates.size > 1) {
-                total += scoreWord(board, coordinates, newTiles)
-            }
+            if (coordinates.size > 1) crossPoints += scoreWord(board, coordinates, newTiles)
         }
-
-        if (move.placements.size == LetterRack.MAX_TILES) {
-            total += SEVEN_TILE_BONUS
+        val bonus = if (move.placements.size == LetterRack.MAX_TILES) SEVEN_TILE_BONUS else 0
+        val details = mutableListOf("Słowo główne ${move.word.uppercase()}: $mainPoints pkt")
+        crossPoints.forEachIndexed { index, points ->
+            details += "Słowo poprzeczne ${index + 1}: $points pkt"
         }
-        return total
+        if (bonus > 0) details += "Bonus za 7 płytek: +$bonus pkt"
+        return ScoreBreakdown(mainPoints + crossPoints.sum() + bonus, mainPoints, crossPoints, bonus, details)
     }
-
     private fun scoreWord(
         board: BoardState,
         coordinates: List<Pair<Int, Int>>,
