@@ -216,4 +216,26 @@ class BoardMoveGeneratorTest {
 
         assertEquals(keys.size, keys.toSet().size)
     }
+
+    @Test
+    fun rejectsMoveWhenAnyOfSeveralCrossWordsIsInvalid() {
+        val generator = BoardMoveGenerator(dictionary(listOf("ko", "ake")))
+        val board = BoardState.empty()
+            .withTile(6, 6, BoardTile('A'))
+            .withTile(8, 6, BoardTile('E'))
+            .withTile(6, 7, BoardTile('A'))
+            .withTile(8, 7, BoardTile('E'))
+        val rack = requireNotNull(LetterRack.parse("KO"))
+
+        val moves = generator.generate(board, rack)
+
+        // Pierwsza nowa litera tworzy AKE, druga AOE. Brak AOE w słowniku
+        // musi unieważnić cały ruch, nawet jeśli AKE jest poprawne.
+        assertTrue(moves.none { move ->
+            move.word == "ko" &&
+                move.horizontal &&
+                move.row == 7 &&
+                move.column == 6
+        })
+    }
 }
