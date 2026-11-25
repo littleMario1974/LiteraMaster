@@ -346,7 +346,7 @@ class BoardReviewActivity : AppCompatActivity() {
                                 append("${index + 1}. ${move.word.uppercase()} — ${breakdown.total} pkt — $direction, ")
                                 append("start ${move.row + 1},${move.column + 1}\n")
                                 breakdown.details.forEach { detail ->
-                                    append("   $detail\\n")
+                                    append("   $detail\n")
                                 }
                                 append("   Dokładane: $newTiles\n")
                             }
