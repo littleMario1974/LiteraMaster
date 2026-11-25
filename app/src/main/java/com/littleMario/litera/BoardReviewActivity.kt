@@ -343,7 +343,7 @@ class BoardReviewActivity : AppCompatActivity() {
                                     val mark = if (placed.tile.isBlank) " (blank)" else ""
                                     "${placed.tile.letter}@${placed.row + 1},${placed.column + 1}$mark"
                                 }
-                                append("${index + 1}. ${move.word.uppercase()} — **$points pkt** — $direction, ")
+                                append("${index + 1}. ${move.word.uppercase()} — $points pkt — $direction, ")
                                 append("start ${move.row + 1},${move.column + 1}\n")
                                 append("   Dokładane: $newTiles\n")
                             }
