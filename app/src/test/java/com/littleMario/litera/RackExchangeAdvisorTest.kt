@@ -96,7 +96,7 @@ class RackExchangeAdvisorTest {
             assertEquals(
                 "Different rack quality for rack: $rack",
                 referenceRackQuality(rack),
-                RackExchangeAdvisor.rackQuality(rack),
+                RackExchangeAdvisor().rackQuality(rack),
                 0.000001
             )
         }
