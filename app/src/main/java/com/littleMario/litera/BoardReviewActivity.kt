@@ -563,4 +563,3 @@ class BoardReviewActivity : AppCompatActivity() {
             "AĄBCĆDEĘFGHIJKLŁMNŃOÓPRSŚTUWYZŹŻ"
     }
 }
-}
