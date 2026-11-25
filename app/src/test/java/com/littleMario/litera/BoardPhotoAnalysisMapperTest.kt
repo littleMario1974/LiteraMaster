@@ -44,6 +44,26 @@ class BoardPhotoAnalysisMapperTest {
         assertEquals(0, analysis.recognizedTileCount)
     }
 
+    @Test
+    fun marksWhiteRecognizedTileAsBlank() {
+        val results = emptyResults().toMutableList()
+        results[0] = BoardCellOcrResult(0, 0, 'A', "A", 0.98f, TileColor.WHITE)
+
+        val analysis = BoardPhotoAnalysisMapper.map(geometry, results)
+
+        assertEquals(true, analysis.recognizedBoard.tileAt(0, 0)?.isBlank)
+    }
+
+    @Test
+    fun doesNotMarkColoredRecognizedTileAsBlank() {
+        val results = emptyResults().toMutableList()
+        results[0] = BoardCellOcrResult(0, 0, 'A', "A", 0.98f, TileColor.YELLOW)
+
+        val analysis = BoardPhotoAnalysisMapper.map(geometry, results)
+
+        assertEquals(false, analysis.recognizedBoard.tileAt(0, 0)?.isBlank)
+    }
+
     private fun emptyResults(): List<BoardCellOcrResult> =
         (0 until BoardState.SIZE).flatMap { row ->
             (0 until BoardState.SIZE).map { column ->
