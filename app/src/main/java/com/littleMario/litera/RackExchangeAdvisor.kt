@@ -95,7 +95,7 @@ class RackExchangeAdvisor(
             )
         }
 
-        val unseen = unseenTiles.toMutableList()
+        val unseen = unseenTiles.toCharArray()
         var bestMask = 0
         var bestExpectedQuality = currentQuality
 
@@ -111,14 +111,26 @@ class RackExchangeAdvisor(
             var qualityTotal = 0.0
 
             repeat(simulationsPerCandidate) { simulation ->
-                val shuffled = unseen.toMutableList()
-                shuffled.shuffle(Random(randomSeed + mask * 1009 + simulation))
+                // Wystarczy wylosować pierwsze opponent + exchangeCount pozycji.
+                // Częściowe Fisher-Yates daje taki sam rozkład próby jak pełne tasowanie,
+                // ale nie miesza pozostałych płytek, których ta symulacja nie wykorzysta.
+                val sample = unseen.copyOf()
+                val random = Random(randomSeed + mask * 1009 + simulation)
+                val sampleSize = opponentRackSize + exchangeCount
+                for (index in 0 until sampleSize) {
+                    val selectedIndex = random.nextInt(index, sample.size)
+                    val temporary = sample[index]
+                    sample[index] = sample[selectedIndex]
+                    sample[selectedIndex] = temporary
+                }
 
-                // Nieznany stojak przeciwnika traktujemy jako losową rezerwę.
-                val hiddenOpponentTiles = opponentRackSize.coerceAtMost(shuffled.size)
-                val availableForDraw = shuffled.drop(hiddenOpponentTiles)
-                val drawn = availableForDraw.take(exchangeCount)
-                qualityTotal += rackQuality(retained + drawn)
+                // Pierwsze pozycje rezerwujemy dla nieznanego stojaka przeciwnika.
+                val candidateRack = ArrayList<Char>(rack.size)
+                candidateRack.addAll(retained)
+                for (index in opponentRackSize until sampleSize) {
+                    candidateRack.add(sample[index])
+                }
+                qualityTotal += rackQuality(candidateRack)
             }
 
             val expectedQuality = qualityTotal / simulationsPerCandidate
