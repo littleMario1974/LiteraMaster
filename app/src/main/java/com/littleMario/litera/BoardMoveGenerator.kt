@@ -31,7 +31,8 @@ class BoardMoveGenerator(
                 initialCounts[index]++
             }
         }
-        val boardHasTiles = board.occupiedTiles().isNotEmpty()
+        // Avoid building a PlacedTile list just to test whether the board is empty.
+        val boardHasTiles = board.hasTiles()
         val results = linkedMapOf<String, BoardMove>()
         for (horizontal in listOf(true, false)) {
             for (row in 0 until BoardState.SIZE) {
