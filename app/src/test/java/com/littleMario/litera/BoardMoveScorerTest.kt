@@ -249,4 +249,25 @@ class BoardMoveScorerTest {
         assertEquals(scorer.explain(board, move).total, scorer.score(board, move))
     }
 
+
+    @Test
+    fun detailedBreakdownKeepsZeroPointCrossWords() {
+        val board = BoardState.empty()
+            .withTile(6, 7, BoardTile('A', isBlank = true))
+        val move = BoardMove(
+            word = "o",
+            row = 7,
+            column = 7,
+            horizontal = true,
+            placements = listOf(PlacedTile(7, 7, BoardTile('O', isBlank = true)))
+        )
+        val scorer = BoardMoveScorer { _, _ -> BoardPremium.NONE }
+
+        val result = scorer.explain(board, move)
+
+        assertEquals(listOf(0), result.crossWordPoints)
+        assertEquals(0, result.total)
+        assertEquals(result.total, scorer.score(board, move))
+    }
+
 }
