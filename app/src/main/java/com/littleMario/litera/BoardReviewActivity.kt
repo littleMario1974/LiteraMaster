@@ -48,12 +48,14 @@ class BoardReviewActivity : AppCompatActivity() {
     private var selectedMove: BoardMove? = null
     private lateinit var boardGrid: GridLayout
     private lateinit var photoPreview: ImageView
+    private lateinit var colorDiagnosticsText: TextView
 
     private var sourceBitmap: Bitmap? = null
     private var currentBoard: BoardState = BoardState.empty()
     private var cachedDawgNodes: Array<Node>? = null
     private var unresolvedPositions: Set<Pair<Int, Int>> = emptySet()
     private var suspectedBlankPositions: Set<Pair<Int, Int>> = emptySet()
+    private var recognizedTileColors: Map<Pair<Int, Int>, TileColor?> = emptyMap()
     private var cellViews: Array<Array<TextView?>> =
         Array(BoardState.SIZE) { arrayOfNulls(BoardState.SIZE) }
 
@@ -247,6 +249,13 @@ class BoardReviewActivity : AppCompatActivity() {
         }
         content.addView(boardGrid)
 
+        colorDiagnosticsText = TextView(this).apply {
+            text = "Diagnostyka kolorów pojawi się po analizie zdjęcia."
+            textSize = 13f
+            setPadding(dp(4), dp(8), dp(4), dp(12))
+        }
+        content.addView(colorDiagnosticsText)
+
         setContentView(ScrollView(this).apply {
             isFillViewport = true
             addView(content)
@@ -297,6 +306,8 @@ class BoardReviewActivity : AppCompatActivity() {
                 currentBoard = BoardState.empty()
                 unresolvedPositions = emptySet()
                 suspectedBlankPositions = emptySet()
+                recognizedTileColors = emptyMap()
+                colorDiagnosticsText.text = "Diagnostyka kolorów pojawi się po analizie zdjęcia."
                 renderBoard()
                 photoPreview.setImageBitmap(decoded)
                 photoPreview.visibility = View.VISIBLE
@@ -324,6 +335,10 @@ class BoardReviewActivity : AppCompatActivity() {
                         suspectedBlankPositions = analysis.cellResults
                             .filter { it.letter != null && it.tileColor == TileColor.WHITE }
                             .map { it.row to it.column }.toSet()
+                        recognizedTileColors = analysis.cellResults
+                            .filter { it.letter != null }
+                            .associate { (it.row to it.column) to it.tileColor }
+                        updateColorDiagnostics(analysis.cellResults)
                         renderBoard()
                         val detectedBlanks = analysis.recognizedBoard.occupiedTiles()
                             .count { it.tile.isBlank }
@@ -540,9 +555,15 @@ class BoardReviewActivity : AppCompatActivity() {
             addView(blankCheckbox)
         }
 
+        val detectedColor = recognizedTileColors[row to column]
+        val colorDescription = if ((row to column) in recognizedTileColors) {
+            "\nKolor odczytany ze zdjęcia: ${colorName(detectedColor)}."
+        } else {
+            "\nBrak rozpoznanego koloru dla tego pola."
+        }
         AlertDialog.Builder(this)
             .setTitle("Pole ${row + 1}, ${column + 1}")
-            .setMessage("Wpisz literę, którą zastępuje płytka. Blank na planszy również ma przypisaną literę.")
+            .setMessage("Wpisz literę, którą zastępuje płytka. Blank na planszy również ma przypisaną literę.$colorDescription")
             .setView(editor)
             .setNegativeButton("Anuluj", null)
             .setNeutralButton("Wyczyść") { _, _ ->
@@ -569,6 +590,35 @@ class BoardReviewActivity : AppCompatActivity() {
                 renderBoard()
             }
             .show()
+    }
+
+    private fun updateColorDiagnostics(results: List<BoardCellOcrResult>) {
+        val occupied = results.filter { it.letter != null }
+        val counts = occupied.groupingBy { it.tileColor }.eachCount()
+        colorDiagnosticsText.text = buildString {
+            append("Diagnostyka kolorów rozpoznanych płytek (tylko pola z odczytaną literą):\\n")
+            append("Żółte: ${counts[TileColor.YELLOW] ?: 0}   ")
+            append("Zielone: ${counts[TileColor.GREEN] ?: 0}   ")
+            append("Niebieskie: ${counts[TileColor.BLUE] ?: 0}\\n")
+            append("Czerwone: ${counts[TileColor.RED] ?: 0}   ")
+            append("Białe: ${counts[TileColor.WHITE] ?: 0}   ")
+            append("Nierozpoznane: ${counts[null] ?: 0}\\n")
+            if (suspectedBlankPositions.isNotEmpty()) {
+                append("Białe pola do sprawdzenia: ")
+                append(suspectedBlankPositions.sortedWith(compareBy<Pair<Int, Int>> { it.first }.thenBy { it.second })
+                    .joinToString { "${it.first + 1},${it.second + 1}" })
+            }
+            append("\\nKolory są orientacyjne; porównaj je z rzeczywistymi płytkami.")
+        }
+    }
+
+    private fun colorName(color: TileColor?): String = when (color) {
+        TileColor.YELLOW -> "żółty"
+        TileColor.GREEN -> "zielony"
+        TileColor.BLUE -> "niebieski"
+        TileColor.RED -> "czerwony"
+        TileColor.WHITE -> "biały (kandydat na blank)"
+        null -> "nierozpoznany"
     }
 
     private fun calculateSampleSize(width: Int, height: Int, maxSide: Int): Int {
