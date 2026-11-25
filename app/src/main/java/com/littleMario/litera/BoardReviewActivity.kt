@@ -320,8 +320,11 @@ class BoardReviewActivity : AppCompatActivity() {
                         unresolvedPositions = analysis.unresolvedCells
                             .map { it.row to it.column }.toSet()
                         renderBoard()
+                        val detectedBlanks = analysis.recognizedBoard.occupiedTiles()
+                            .count { it.tile.isBlank }
                         statusText.text =
-                            "Rozpoznano ${analysis.recognizedTileCount} liter. " +
+                            "Rozpoznano ${analysis.recognizedTileCount} liter, " +
+                            "w tym blanki: ${detectedBlanks}. " +
                             "Do sprawdzenia: ${analysis.unresolvedCount} pól."
                         choosePhotoButton.isEnabled = true
                         analyzeButton.isEnabled = true
