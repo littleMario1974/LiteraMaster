@@ -174,7 +174,7 @@ class BoardMoveScorer(
         )
         var crossTotal = 0
         for (placed in move.placements) {
-            crossTotal += scoreCrossWord(board, placed, newTiles, move.horizontal)
+            crossTotal += scoreCrossWord(board, placed, newTiles, move.horizontal) ?: 0
         }
         val bonus = if (move.placements.size == LetterRack.MAX_TILES) SEVEN_TILE_BONUS else 0
         return mainPoints + crossTotal + bonus
@@ -189,8 +189,8 @@ class BoardMoveScorer(
         )
         val crossPoints = mutableListOf<Int>()
         for (placed in move.placements) {
-            val points = scoreCrossWord(board, placed, newTiles, move.horizontal)
-            if (points > 0) crossPoints += points
+            val points = scoreCrossWord(board, placed, newTiles, move.horizontal) ?: continue
+            crossPoints += points
         }
         val bonus = if (move.placements.size == LetterRack.MAX_TILES) SEVEN_TILE_BONUS else 0
         val details = mutableListOf("Słowo główne ${move.word.uppercase()}: $mainPoints pkt")
@@ -258,7 +258,7 @@ class BoardMoveScorer(
         placed: PlacedTile,
         newTiles: Array<PlacedTile?>,
         mainHorizontal: Boolean
-    ): Int {
+    ): Int? {
         val dr = if (mainHorizontal) 1 else 0
         val dc = if (mainHorizontal) 0 else 1
         var startRow = placed.row
@@ -280,7 +280,7 @@ class BoardMoveScorer(
             column += dc
         }
 
-        if (length <= 1) return 0
+        if (length <= 1) return null
         return scoreWord(board, startRow, startColumn, !mainHorizontal, length, newTiles)
     }
 
