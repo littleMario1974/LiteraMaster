@@ -95,4 +95,42 @@ class BoardMoveGeneratorTest {
         assertTrue(moves.any { it.placements.any { placed -> placed.tile.isBlank && placed.tile.letter == 'Ś' } })
     }
 
+
+    @Test
+    fun rejectsMoveWhenItCreatesInvalidCrossWord() {
+        val generator = BoardMoveGenerator(dictionary(listOf("kot")))
+        val board = BoardState.empty()
+            .withTile(6, 7, BoardTile('A'))
+            .withTile(8, 7, BoardTile('E'))
+        val rack = requireNotNull(LetterRack.parse("KOT"))
+
+        val moves = generator.generate(board, rack)
+
+        // Położenie O między A i E utworzyłoby pionowe słowo AOE,
+        // którego nie ma w słowniku.
+        assertTrue(moves.none { move ->
+            move.word == "kot" &&
+                move.horizontal &&
+                move.row == 7 &&
+                move.column == 6
+        })
+    }
+
+    @Test
+    fun acceptsMoveWhenEveryCreatedCrossWordIsInDictionary() {
+        val generator = BoardMoveGenerator(dictionary(listOf("kot", "aoe")))
+        val board = BoardState.empty()
+            .withTile(6, 7, BoardTile('A'))
+            .withTile(8, 7, BoardTile('E'))
+        val rack = requireNotNull(LetterRack.parse("KOT"))
+
+        val moves = generator.generate(board, rack)
+
+        assertTrue(moves.any { move ->
+            move.word == "kot" &&
+                move.horizontal &&
+                move.row == 7 &&
+                move.column == 6
+        })
+    }
 }
