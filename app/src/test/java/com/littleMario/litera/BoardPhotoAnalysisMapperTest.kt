@@ -45,13 +45,15 @@ class BoardPhotoAnalysisMapperTest {
     }
 
     @Test
-    fun marksWhiteRecognizedTileAsBlank() {
+    fun whiteRecognizedTileRemainsOrdinaryUntilBlankIsConfirmedManually() {
         val results = emptyResults().toMutableList()
         results[0] = BoardCellOcrResult(0, 0, 'A', "A", 0.98f, TileColor.WHITE)
 
         val analysis = BoardPhotoAnalysisMapper.map(geometry, results)
+        val tile = analysis.recognizedBoard.tileAt(0, 0)
 
-        assertEquals(true, analysis.recognizedBoard.tileAt(0, 0)?.isBlank)
+        assertEquals('A', tile?.letter)
+        assertEquals(false, tile?.isBlank)
     }
 
     @Test
