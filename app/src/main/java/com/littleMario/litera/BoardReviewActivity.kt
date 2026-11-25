@@ -53,6 +53,7 @@ class BoardReviewActivity : AppCompatActivity() {
     private var currentBoard: BoardState = BoardState.empty()
     private var cachedDawgNodes: Array<Node>? = null
     private var unresolvedPositions: Set<Pair<Int, Int>> = emptySet()
+    private var suspectedBlankPositions: Set<Pair<Int, Int>> = emptySet()
     private var cellViews: Array<Array<TextView?>> =
         Array(BoardState.SIZE) { arrayOfNulls(BoardState.SIZE) }
 
@@ -295,6 +296,7 @@ class BoardReviewActivity : AppCompatActivity() {
                 sourceBitmap = decoded
                 currentBoard = BoardState.empty()
                 unresolvedPositions = emptySet()
+                suspectedBlankPositions = emptySet()
                 renderBoard()
                 photoPreview.setImageBitmap(decoded)
                 photoPreview.visibility = View.VISIBLE
@@ -319,13 +321,18 @@ class BoardReviewActivity : AppCompatActivity() {
                         currentBoard = analysis.recognizedBoard
                         unresolvedPositions = analysis.unresolvedCells
                             .map { it.row to it.column }.toSet()
+                        suspectedBlankPositions = analysis.cellResults
+                            .filter { it.letter != null && it.tileColor == TileColor.WHITE }
+                            .map { it.row to it.column }.toSet()
                         renderBoard()
                         val detectedBlanks = analysis.recognizedBoard.occupiedTiles()
                             .count { it.tile.isBlank }
                         statusText.text =
                             "Rozpoznano ${analysis.recognizedTileCount} liter, " +
-                            "w tym blanki: ${detectedBlanks}. " +
-                            "Do sprawdzenia: ${analysis.unresolvedCount} pól."
+                            "Potwierdzone blanki: ${detectedBlanks}. " +
+                            "Białe płytki do sprawdzenia: ${suspectedBlankPositions.size}. " +
+                            "Pola wymagające korekty OCR: ${analysis.unresolvedCount}. " +
+                            "Dotknij oznaczonej płytki i zaznacz blank, jeśli to biała płytka."
                         choosePhotoButton.isEnabled = true
                         analyzeButton.isEnabled = true
                     }
@@ -488,14 +495,21 @@ class BoardReviewActivity : AppCompatActivity() {
                     it.row == row && it.column == column
                 }?.tile
                 val displayedTile = previewTile ?: tile
+                val position = row to column
+                val suspectedBlank = position in suspectedBlankPositions && tile != null && !tile.isBlank
                 view.text = displayedTile?.let { tile ->
-                    tile.letter.uppercaseChar().toString() + if (tile.isBlank) "*" else ""
+                    tile.letter.uppercaseChar().toString() + when {
+                        tile.isBlank -> "*"
+                        suspectedBlank && previewTile == null -> "?"
+                        else -> ""
+                    }
                 } ?: ""
-                val unresolved = (row to column) in unresolvedPositions
+                val unresolved = position in unresolvedPositions
                 view.setBackgroundColor(
                     when {
                         previewTile != null -> Color.rgb(255, 170, 70)
                         unresolved -> Color.rgb(255, 224, 130)
+                        suspectedBlank -> Color.rgb(220, 210, 255)
                         tile != null -> Color.rgb(255, 255, 255)
                         else -> Color.rgb(225, 235, 240)
                     }
@@ -534,6 +548,7 @@ class BoardReviewActivity : AppCompatActivity() {
             .setNeutralButton("Wyczyść") { _, _ ->
                 currentBoard = currentBoard.withTile(row, column, null)
                 unresolvedPositions = unresolvedPositions - (row to column)
+                suspectedBlankPositions = suspectedBlankPositions - (row to column)
                 renderBoard()
             }
             .setPositiveButton("Zapisz") { _, _ ->
