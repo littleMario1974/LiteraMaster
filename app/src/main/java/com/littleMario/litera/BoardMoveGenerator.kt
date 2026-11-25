@@ -110,31 +110,67 @@ class BoardMoveGenerator(
             val child = node.next[index]
             if (child == -1) continue
 
-            val availableSources = buildList {
-                if (counts[index] > 0) add(index to false)
-                if (counts[alphabet.length] > 0) add(alphabet.length to true)
-            }
-
-            for ((countIndex, usesBlank) in availableSources) {
-                counts[countIndex]--
-                val letter = alphabet[index]
-                path.append(letter)
-                placements.add(
-                    PlacedTile(
-                        row,
-                        column,
-                        BoardTile(letter.uppercaseChar(), isBlank = usesBlank)
-                    )
+            // Explore a normal rack tile and a blank directly. Building a
+            // temporary list of Pair values here would allocate at every
+            // recursive DAWG node.
+            if (counts[index] > 0) {
+                explorePlacement(
+                    board, row, column, startRow, startColumn, horizontal,
+                    child, index, index, false, counts, path, placements, results, boardHasTiles
                 )
-
-                recordIfComplete(board, nextRow, nextColumn, startRow, startColumn, horizontal, child, path, placements, results, boardHasTiles)
-                search(board, nextRow, nextColumn, startRow, startColumn, horizontal, child, counts, path, placements, results, boardHasTiles)
-
-                placements.removeAt(placements.lastIndex)
-                path.deleteCharAt(path.length - 1)
-                counts[countIndex]++
+            }
+            val blankIndex = alphabet.length
+            if (counts[blankIndex] > 0) {
+                explorePlacement(
+                    board, row, column, startRow, startColumn, horizontal,
+                    child, index, blankIndex, true, counts, path, placements, results, boardHasTiles
+                )
             }
         }
+    }
+
+    private fun explorePlacement(
+        board: BoardState,
+        row: Int,
+        column: Int,
+        startRow: Int,
+        startColumn: Int,
+        horizontal: Boolean,
+        child: Int,
+        letterIndex: Int,
+        countIndex: Int,
+        usesBlank: Boolean,
+        counts: IntArray,
+        path: StringBuilder,
+        placements: MutableList<PlacedTile>,
+        results: MutableMap<String, BoardMove>,
+        boardHasTiles: Boolean
+    ) {
+        counts[countIndex]--
+        val placedLetter = alphabet[letterIndex]
+        path.append(placedLetter)
+        placements.add(
+            PlacedTile(
+                row,
+                column,
+                BoardTile(placedLetter.uppercaseChar(), isBlank = usesBlank)
+            )
+        )
+
+        val nextRow = row + if (horizontal) 0 else 1
+        val nextColumn = column + if (horizontal) 1 else 0
+        recordIfComplete(
+            board, nextRow, nextColumn, startRow, startColumn, horizontal,
+            child, path, placements, results, boardHasTiles
+        )
+        search(
+            board, nextRow, nextColumn, startRow, startColumn, horizontal,
+            child, counts, path, placements, results, boardHasTiles
+        )
+
+        placements.removeAt(placements.lastIndex)
+        path.deleteCharAt(path.length - 1)
+        counts[countIndex]++
     }
 
     private fun recordIfComplete(
