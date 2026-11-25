@@ -37,6 +37,11 @@ class BoardReviewActivity : AppCompatActivity() {
     private lateinit var findMovesButton: Button
     private lateinit var movesText: TextView
     private lateinit var movesActionsContainer: LinearLayout
+    private lateinit var previousMoveButton: Button
+    private lateinit var nextMoveButton: Button
+    private lateinit var previewMoveLabel: TextView
+    private var previewMoves: List<BoardMove> = emptyList()
+    private var selectedMoveIndex: Int? = null
     private var selectedMove: BoardMove? = null
     private lateinit var boardGrid: GridLayout
     private lateinit var photoPreview: ImageView
@@ -152,7 +157,39 @@ class BoardReviewActivity : AppCompatActivity() {
 
         movesActionsContainer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            visibility = View.GONE
         }
+        val previewNavigation = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        previousMoveButton = Button(this).apply {
+            text = "Poprzedni"
+            isEnabled = false
+            setOnClickListener { selectedMoveIndex?.let { showPreviewAt(it - 1) } }
+        }
+        previewMoveLabel = TextView(this).apply {
+            text = ""
+            textSize = 14f
+            gravity = Gravity.CENTER
+            setPadding(dp(4), 0, dp(4), 0)
+        }
+        nextMoveButton = Button(this).apply {
+            text = "Następny"
+            isEnabled = false
+            setOnClickListener { selectedMoveIndex?.let { showPreviewAt(it + 1) } }
+        }
+        previewNavigation.addView(previousMoveButton,
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        previewNavigation.addView(previewMoveLabel,
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 2f))
+        previewNavigation.addView(nextMoveButton,
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        movesActionsContainer.addView(previewNavigation)
+        movesActionsContainer.addView(Button(this).apply {
+            text = "Usuń podgląd ruchu"
+            setOnClickListener { clearMovePreview() }
+        })
         content.addView(movesActionsContainer)
 
         photoPreview = ImageView(this).apply {
@@ -317,8 +354,11 @@ class BoardReviewActivity : AppCompatActivity() {
         }
 
         val boardSnapshot = currentBoard
+        previewMoves = emptyList()
+        selectedMoveIndex = null
         selectedMove = null
-        movesActionsContainer.removeAllViews()
+        movesActionsContainer.visibility = View.GONE
+        previewMoveLabel.text = ""
         renderBoard()
         findMovesButton.isEnabled = false
         movesText.text = "Wyszukiwanie ruchów…"
@@ -344,27 +384,11 @@ class BoardReviewActivity : AppCompatActivity() {
                         movesText.text = "Nie znaleziono legalnych ruchów dla podanego stojaka."
                     } else {
                         val shown = rankedMoves.take(MAX_DISPLAYED_MOVES)
-                        movesActionsContainer.removeAllViews()
-                        shown.forEachIndexed { index, pair ->
-                            val move = pair.first
-                            val points = pair.second.total
-                            movesActionsContainer.addView(Button(this).apply {
-                                text = "Podgląd ${index + 1}: ${move.word.uppercase()} — $points pkt"
-                                setOnClickListener {
-                                    selectedMove = move
-                                    renderBoard()
-                                    statusText.text = "Podgląd ruchu: ${move.word.uppercase()}. Nowe płytki są zaznaczone na pomarańczowo."
-                                }
-                            })
-                        }
-                        movesActionsContainer.addView(Button(this).apply {
-                            text = "Usuń podgląd ruchu"
-                            setOnClickListener {
-                                selectedMove = null
-                                renderBoard()
-                                statusText.text = "Podgląd ruchu wyłączony."
-                            }
-                        })
+                        previewMoves = shown.map { it.first }
+                        selectedMoveIndex = null
+                        selectedMove = null
+                        movesActionsContainer.visibility = View.VISIBLE
+                        updatePreviewNavigation()
                         movesText.text = buildString {
                             append("Znalezione propozycje: ${rankedMoves.size}\n")
                             append("Ranking według punktów (premie Literaków uwzględnione).\n\n")
@@ -400,6 +424,556 @@ class BoardReviewActivity : AppCompatActivity() {
         }
     }
 
+    private fun showPreviewAt(index: Int) {
+        if (index !in previewMoves.indices) return
+        selectedMoveIndex = index
+        selectedMove = previewMoves[index]
+        updatePreviewNavigation()
+        renderBoard()
+        val move = previewMoves[index]
+        statusText.text = "Podgląd ruchu ${'
+        for (row in 0 until BoardState.SIZE) {
+            for (column in 0 until BoardState.SIZE) {
+                val view = cellViews[row][column] ?: continue
+                val tile = currentBoard.tileAt(row, column)
+                val previewTile = selectedMove?.placements?.firstOrNull { it.row == row && it.column == column }?.tile
+                val displayedTile = previewTile ?: tile
+                view.text = displayedTile?.letter?.uppercaseChar()?.toString() ?: ""
+                val unresolved = (row to column) in unresolvedPositions
+                view.setBackgroundColor(
+                    when {
+                        previewTile != null -> Color.rgb(255, 170, 70)
+                        unresolved -> Color.rgb(255, 224, 130)
+                        tile != null -> Color.rgb(255, 255, 255)
+                        else -> Color.rgb(225, 235, 240)
+                    }
+                )
+                view.setTypeface(null, if (displayedTile != null) Typeface.BOLD else Typeface.NORMAL)
+            }
+        }
+    }
+
+    private fun editCell(row: Int, column: Int) {
+        clearMovePreview()
+        val input = EditText(this).apply {
+            hint = "Litera lub puste pole"
+            filters = arrayOf(android.text.InputFilter.LengthFilter(1))
+            setSingleLine(true)
+            setText(currentBoard.tileAt(row, column)?.letter?.toString() ?: "")
+            setSelection(text.length)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Pole ${row + 1}, ${column + 1}")
+            .setMessage("Wpisz jedną literę polskiego alfabetu albo usuń zawartość.")
+            .setView(input)
+            .setNegativeButton("Anuluj", null)
+            .setNeutralButton("Wyczyść") { _, _ ->
+                currentBoard = currentBoard.withTile(row, column, null)
+                unresolvedPositions = unresolvedPositions - (row to column)
+                renderBoard()
+            }
+            .setPositiveButton("Zapisz") { _, _ ->
+                val value = input.text.toString().trim().uppercase()
+                if (value.isEmpty()) {
+                    currentBoard = currentBoard.withTile(row, column, null)
+                } else if (value.length == 1 && value[0] in POLISH_ALPHABET) {
+                    currentBoard = currentBoard.withTile(row, column, BoardTile(value[0]))
+                } else {
+                    Toast.makeText(
+                        this, "Wpisz jedną literę polskiego alfabetu.",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    return@setPositiveButton
+                }
+                unresolvedPositions = unresolvedPositions - (row to column)
+                renderBoard()
+            }
+            .show()
+    }
+
+    private fun calculateSampleSize(width: Int, height: Int, maxSide: Int): Int {
+        var sample = 1
+        while (maxOf(width / (sample * 2), height / (sample * 2)) >= maxSide) {
+            sample *= 2
+        }
+        return sample
+    }
+
+    private fun dp(value: Int): Int =
+        (value * resources.displayMetrics.density).toInt()
+
+    override fun onDestroy() {
+        sourceBitmap?.recycle()
+        sourceBitmap = null
+        analysisExecutor.shutdown()
+        super.onDestroy()
+    }
+
+    companion object {
+        private const val MAX_IMAGE_SIDE = 2200
+        private const val MAX_DISPLAYED_MOVES = 20
+        private const val POLISH_ALPHABET =
+            "AĄBCĆDEĘFGHIJKLŁMNŃOÓPRSŚTUWYZŹŻ"
+    }
+}
+}{index + 1}/${'
+        for (row in 0 until BoardState.SIZE) {
+            for (column in 0 until BoardState.SIZE) {
+                val view = cellViews[row][column] ?: continue
+                val tile = currentBoard.tileAt(row, column)
+                val previewTile = selectedMove?.placements?.firstOrNull { it.row == row && it.column == column }?.tile
+                val displayedTile = previewTile ?: tile
+                view.text = displayedTile?.letter?.uppercaseChar()?.toString() ?: ""
+                val unresolved = (row to column) in unresolvedPositions
+                view.setBackgroundColor(
+                    when {
+                        previewTile != null -> Color.rgb(255, 170, 70)
+                        unresolved -> Color.rgb(255, 224, 130)
+                        tile != null -> Color.rgb(255, 255, 255)
+                        else -> Color.rgb(225, 235, 240)
+                    }
+                )
+                view.setTypeface(null, if (displayedTile != null) Typeface.BOLD else Typeface.NORMAL)
+            }
+        }
+    }
+
+    private fun editCell(row: Int, column: Int) {
+        selectedMove = null
+        renderBoard()
+        val input = EditText(this).apply {
+            hint = "Litera lub puste pole"
+            filters = arrayOf(android.text.InputFilter.LengthFilter(1))
+            setSingleLine(true)
+            setText(currentBoard.tileAt(row, column)?.letter?.toString() ?: "")
+            setSelection(text.length)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Pole ${row + 1}, ${column + 1}")
+            .setMessage("Wpisz jedną literę polskiego alfabetu albo usuń zawartość.")
+            .setView(input)
+            .setNegativeButton("Anuluj", null)
+            .setNeutralButton("Wyczyść") { _, _ ->
+                currentBoard = currentBoard.withTile(row, column, null)
+                unresolvedPositions = unresolvedPositions - (row to column)
+                renderBoard()
+            }
+            .setPositiveButton("Zapisz") { _, _ ->
+                val value = input.text.toString().trim().uppercase()
+                if (value.isEmpty()) {
+                    currentBoard = currentBoard.withTile(row, column, null)
+                } else if (value.length == 1 && value[0] in POLISH_ALPHABET) {
+                    currentBoard = currentBoard.withTile(row, column, BoardTile(value[0]))
+                } else {
+                    Toast.makeText(
+                        this, "Wpisz jedną literę polskiego alfabetu.",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    return@setPositiveButton
+                }
+                unresolvedPositions = unresolvedPositions - (row to column)
+                renderBoard()
+            }
+            .show()
+    }
+
+    private fun calculateSampleSize(width: Int, height: Int, maxSide: Int): Int {
+        var sample = 1
+        while (maxOf(width / (sample * 2), height / (sample * 2)) >= maxSide) {
+            sample *= 2
+        }
+        return sample
+    }
+
+    private fun dp(value: Int): Int =
+        (value * resources.displayMetrics.density).toInt()
+
+    override fun onDestroy() {
+        sourceBitmap?.recycle()
+        sourceBitmap = null
+        analysisExecutor.shutdown()
+        super.onDestroy()
+    }
+
+    companion object {
+        private const val MAX_IMAGE_SIDE = 2200
+        private const val MAX_DISPLAYED_MOVES = 20
+        private const val POLISH_ALPHABET =
+            "AĄBCĆDEĘFGHIJKLŁMNŃOÓPRSŚTUWYZŹŻ"
+    }
+}
+}{previewMoves.size}: " +
+            "${'
+        for (row in 0 until BoardState.SIZE) {
+            for (column in 0 until BoardState.SIZE) {
+                val view = cellViews[row][column] ?: continue
+                val tile = currentBoard.tileAt(row, column)
+                val previewTile = selectedMove?.placements?.firstOrNull { it.row == row && it.column == column }?.tile
+                val displayedTile = previewTile ?: tile
+                view.text = displayedTile?.letter?.uppercaseChar()?.toString() ?: ""
+                val unresolved = (row to column) in unresolvedPositions
+                view.setBackgroundColor(
+                    when {
+                        previewTile != null -> Color.rgb(255, 170, 70)
+                        unresolved -> Color.rgb(255, 224, 130)
+                        tile != null -> Color.rgb(255, 255, 255)
+                        else -> Color.rgb(225, 235, 240)
+                    }
+                )
+                view.setTypeface(null, if (displayedTile != null) Typeface.BOLD else Typeface.NORMAL)
+            }
+        }
+    }
+
+    private fun editCell(row: Int, column: Int) {
+        selectedMove = null
+        renderBoard()
+        val input = EditText(this).apply {
+            hint = "Litera lub puste pole"
+            filters = arrayOf(android.text.InputFilter.LengthFilter(1))
+            setSingleLine(true)
+            setText(currentBoard.tileAt(row, column)?.letter?.toString() ?: "")
+            setSelection(text.length)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Pole ${row + 1}, ${column + 1}")
+            .setMessage("Wpisz jedną literę polskiego alfabetu albo usuń zawartość.")
+            .setView(input)
+            .setNegativeButton("Anuluj", null)
+            .setNeutralButton("Wyczyść") { _, _ ->
+                currentBoard = currentBoard.withTile(row, column, null)
+                unresolvedPositions = unresolvedPositions - (row to column)
+                renderBoard()
+            }
+            .setPositiveButton("Zapisz") { _, _ ->
+                val value = input.text.toString().trim().uppercase()
+                if (value.isEmpty()) {
+                    currentBoard = currentBoard.withTile(row, column, null)
+                } else if (value.length == 1 && value[0] in POLISH_ALPHABET) {
+                    currentBoard = currentBoard.withTile(row, column, BoardTile(value[0]))
+                } else {
+                    Toast.makeText(
+                        this, "Wpisz jedną literę polskiego alfabetu.",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    return@setPositiveButton
+                }
+                unresolvedPositions = unresolvedPositions - (row to column)
+                renderBoard()
+            }
+            .show()
+    }
+
+    private fun calculateSampleSize(width: Int, height: Int, maxSide: Int): Int {
+        var sample = 1
+        while (maxOf(width / (sample * 2), height / (sample * 2)) >= maxSide) {
+            sample *= 2
+        }
+        return sample
+    }
+
+    private fun dp(value: Int): Int =
+        (value * resources.displayMetrics.density).toInt()
+
+    override fun onDestroy() {
+        sourceBitmap?.recycle()
+        sourceBitmap = null
+        analysisExecutor.shutdown()
+        super.onDestroy()
+    }
+
+    companion object {
+        private const val MAX_IMAGE_SIDE = 2200
+        private const val MAX_DISPLAYED_MOVES = 20
+        private const val POLISH_ALPHABET =
+            "AĄBCĆDEĘFGHIJKLŁMNŃOÓPRSŚTUWYZŹŻ"
+    }
+}
+}{move.word.uppercase()}. Nowe płytki są zaznaczone na pomarańczowo."
+    }
+
+    private fun clearMovePreview() {
+        selectedMoveIndex = null
+        selectedMove = null
+        updatePreviewNavigation()
+        renderBoard()
+        statusText.text = "Podgląd ruchu wyłączony."
+    }
+
+    private fun updatePreviewNavigation() {
+        val index = selectedMoveIndex
+        previewMoveLabel.text = if (index == null) {
+            "Wybierz ruch"
+        } else {
+            "${'
+        for (row in 0 until BoardState.SIZE) {
+            for (column in 0 until BoardState.SIZE) {
+                val view = cellViews[row][column] ?: continue
+                val tile = currentBoard.tileAt(row, column)
+                val previewTile = selectedMove?.placements?.firstOrNull { it.row == row && it.column == column }?.tile
+                val displayedTile = previewTile ?: tile
+                view.text = displayedTile?.letter?.uppercaseChar()?.toString() ?: ""
+                val unresolved = (row to column) in unresolvedPositions
+                view.setBackgroundColor(
+                    when {
+                        previewTile != null -> Color.rgb(255, 170, 70)
+                        unresolved -> Color.rgb(255, 224, 130)
+                        tile != null -> Color.rgb(255, 255, 255)
+                        else -> Color.rgb(225, 235, 240)
+                    }
+                )
+                view.setTypeface(null, if (displayedTile != null) Typeface.BOLD else Typeface.NORMAL)
+            }
+        }
+    }
+
+    private fun editCell(row: Int, column: Int) {
+        selectedMove = null
+        renderBoard()
+        val input = EditText(this).apply {
+            hint = "Litera lub puste pole"
+            filters = arrayOf(android.text.InputFilter.LengthFilter(1))
+            setSingleLine(true)
+            setText(currentBoard.tileAt(row, column)?.letter?.toString() ?: "")
+            setSelection(text.length)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Pole ${row + 1}, ${column + 1}")
+            .setMessage("Wpisz jedną literę polskiego alfabetu albo usuń zawartość.")
+            .setView(input)
+            .setNegativeButton("Anuluj", null)
+            .setNeutralButton("Wyczyść") { _, _ ->
+                currentBoard = currentBoard.withTile(row, column, null)
+                unresolvedPositions = unresolvedPositions - (row to column)
+                renderBoard()
+            }
+            .setPositiveButton("Zapisz") { _, _ ->
+                val value = input.text.toString().trim().uppercase()
+                if (value.isEmpty()) {
+                    currentBoard = currentBoard.withTile(row, column, null)
+                } else if (value.length == 1 && value[0] in POLISH_ALPHABET) {
+                    currentBoard = currentBoard.withTile(row, column, BoardTile(value[0]))
+                } else {
+                    Toast.makeText(
+                        this, "Wpisz jedną literę polskiego alfabetu.",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    return@setPositiveButton
+                }
+                unresolvedPositions = unresolvedPositions - (row to column)
+                renderBoard()
+            }
+            .show()
+    }
+
+    private fun calculateSampleSize(width: Int, height: Int, maxSide: Int): Int {
+        var sample = 1
+        while (maxOf(width / (sample * 2), height / (sample * 2)) >= maxSide) {
+            sample *= 2
+        }
+        return sample
+    }
+
+    private fun dp(value: Int): Int =
+        (value * resources.displayMetrics.density).toInt()
+
+    override fun onDestroy() {
+        sourceBitmap?.recycle()
+        sourceBitmap = null
+        analysisExecutor.shutdown()
+        super.onDestroy()
+    }
+
+    companion object {
+        private const val MAX_IMAGE_SIDE = 2200
+        private const val MAX_DISPLAYED_MOVES = 20
+        private const val POLISH_ALPHABET =
+            "AĄBCĆDEĘFGHIJKLŁMNŃOÓPRSŚTUWYZŹŻ"
+    }
+}
+}{index + 1}/${'
+        for (row in 0 until BoardState.SIZE) {
+            for (column in 0 until BoardState.SIZE) {
+                val view = cellViews[row][column] ?: continue
+                val tile = currentBoard.tileAt(row, column)
+                val previewTile = selectedMove?.placements?.firstOrNull { it.row == row && it.column == column }?.tile
+                val displayedTile = previewTile ?: tile
+                view.text = displayedTile?.letter?.uppercaseChar()?.toString() ?: ""
+                val unresolved = (row to column) in unresolvedPositions
+                view.setBackgroundColor(
+                    when {
+                        previewTile != null -> Color.rgb(255, 170, 70)
+                        unresolved -> Color.rgb(255, 224, 130)
+                        tile != null -> Color.rgb(255, 255, 255)
+                        else -> Color.rgb(225, 235, 240)
+                    }
+                )
+                view.setTypeface(null, if (displayedTile != null) Typeface.BOLD else Typeface.NORMAL)
+            }
+        }
+    }
+
+    private fun editCell(row: Int, column: Int) {
+        selectedMove = null
+        renderBoard()
+        val input = EditText(this).apply {
+            hint = "Litera lub puste pole"
+            filters = arrayOf(android.text.InputFilter.LengthFilter(1))
+            setSingleLine(true)
+            setText(currentBoard.tileAt(row, column)?.letter?.toString() ?: "")
+            setSelection(text.length)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Pole ${row + 1}, ${column + 1}")
+            .setMessage("Wpisz jedną literę polskiego alfabetu albo usuń zawartość.")
+            .setView(input)
+            .setNegativeButton("Anuluj", null)
+            .setNeutralButton("Wyczyść") { _, _ ->
+                currentBoard = currentBoard.withTile(row, column, null)
+                unresolvedPositions = unresolvedPositions - (row to column)
+                renderBoard()
+            }
+            .setPositiveButton("Zapisz") { _, _ ->
+                val value = input.text.toString().trim().uppercase()
+                if (value.isEmpty()) {
+                    currentBoard = currentBoard.withTile(row, column, null)
+                } else if (value.length == 1 && value[0] in POLISH_ALPHABET) {
+                    currentBoard = currentBoard.withTile(row, column, BoardTile(value[0]))
+                } else {
+                    Toast.makeText(
+                        this, "Wpisz jedną literę polskiego alfabetu.",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    return@setPositiveButton
+                }
+                unresolvedPositions = unresolvedPositions - (row to column)
+                renderBoard()
+            }
+            .show()
+    }
+
+    private fun calculateSampleSize(width: Int, height: Int, maxSide: Int): Int {
+        var sample = 1
+        while (maxOf(width / (sample * 2), height / (sample * 2)) >= maxSide) {
+            sample *= 2
+        }
+        return sample
+    }
+
+    private fun dp(value: Int): Int =
+        (value * resources.displayMetrics.density).toInt()
+
+    override fun onDestroy() {
+        sourceBitmap?.recycle()
+        sourceBitmap = null
+        analysisExecutor.shutdown()
+        super.onDestroy()
+    }
+
+    companion object {
+        private const val MAX_IMAGE_SIDE = 2200
+        private const val MAX_DISPLAYED_MOVES = 20
+        private const val POLISH_ALPHABET =
+            "AĄBCĆDEĘFGHIJKLŁMNŃOÓPRSŚTUWYZŹŻ"
+    }
+}
+}{previewMoves.size}\n${'
+        for (row in 0 until BoardState.SIZE) {
+            for (column in 0 until BoardState.SIZE) {
+                val view = cellViews[row][column] ?: continue
+                val tile = currentBoard.tileAt(row, column)
+                val previewTile = selectedMove?.placements?.firstOrNull { it.row == row && it.column == column }?.tile
+                val displayedTile = previewTile ?: tile
+                view.text = displayedTile?.letter?.uppercaseChar()?.toString() ?: ""
+                val unresolved = (row to column) in unresolvedPositions
+                view.setBackgroundColor(
+                    when {
+                        previewTile != null -> Color.rgb(255, 170, 70)
+                        unresolved -> Color.rgb(255, 224, 130)
+                        tile != null -> Color.rgb(255, 255, 255)
+                        else -> Color.rgb(225, 235, 240)
+                    }
+                )
+                view.setTypeface(null, if (displayedTile != null) Typeface.BOLD else Typeface.NORMAL)
+            }
+        }
+    }
+
+    private fun editCell(row: Int, column: Int) {
+        selectedMove = null
+        renderBoard()
+        val input = EditText(this).apply {
+            hint = "Litera lub puste pole"
+            filters = arrayOf(android.text.InputFilter.LengthFilter(1))
+            setSingleLine(true)
+            setText(currentBoard.tileAt(row, column)?.letter?.toString() ?: "")
+            setSelection(text.length)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Pole ${row + 1}, ${column + 1}")
+            .setMessage("Wpisz jedną literę polskiego alfabetu albo usuń zawartość.")
+            .setView(input)
+            .setNegativeButton("Anuluj", null)
+            .setNeutralButton("Wyczyść") { _, _ ->
+                currentBoard = currentBoard.withTile(row, column, null)
+                unresolvedPositions = unresolvedPositions - (row to column)
+                renderBoard()
+            }
+            .setPositiveButton("Zapisz") { _, _ ->
+                val value = input.text.toString().trim().uppercase()
+                if (value.isEmpty()) {
+                    currentBoard = currentBoard.withTile(row, column, null)
+                } else if (value.length == 1 && value[0] in POLISH_ALPHABET) {
+                    currentBoard = currentBoard.withTile(row, column, BoardTile(value[0]))
+                } else {
+                    Toast.makeText(
+                        this, "Wpisz jedną literę polskiego alfabetu.",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    return@setPositiveButton
+                }
+                unresolvedPositions = unresolvedPositions - (row to column)
+                renderBoard()
+            }
+            .show()
+    }
+
+    private fun calculateSampleSize(width: Int, height: Int, maxSide: Int): Int {
+        var sample = 1
+        while (maxOf(width / (sample * 2), height / (sample * 2)) >= maxSide) {
+            sample *= 2
+        }
+        return sample
+    }
+
+    private fun dp(value: Int): Int =
+        (value * resources.displayMetrics.density).toInt()
+
+    override fun onDestroy() {
+        sourceBitmap?.recycle()
+        sourceBitmap = null
+        analysisExecutor.shutdown()
+        super.onDestroy()
+    }
+
+    companion object {
+        private const val MAX_IMAGE_SIDE = 2200
+        private const val MAX_DISPLAYED_MOVES = 20
+        private const val POLISH_ALPHABET =
+            "AĄBCĆDEĘFGHIJKLŁMNŃOÓPRSŚTUWYZŹŻ"
+    }
+}
+}{previewMoves[index].word.uppercase()}"
+        }
+        previousMoveButton.isEnabled = index != null && index > 0
+        nextMoveButton.isEnabled = index != null && index < previewMoves.lastIndex
+    }
     private fun renderBoard() {
         for (row in 0 until BoardState.SIZE) {
             for (column in 0 until BoardState.SIZE) {
