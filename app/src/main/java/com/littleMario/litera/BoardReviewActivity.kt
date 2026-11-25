@@ -621,6 +621,7 @@ class BoardReviewActivity : AppCompatActivity() {
                 suspectedBlankPositions = suspectedBlankPositions - (row to column)
                 lowConfidencePositions = lowConfidencePositions - (row to column)
                 recognizedTileConfidences = recognizedTileConfidences - (row to column)
+                recognizedRawTexts = recognizedRawTexts - (row to column)
                 renderBoard()
             }
             .show()
