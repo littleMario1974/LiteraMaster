@@ -162,22 +162,35 @@ class BoardMoveScorer(
     private val premiumAt: (row: Int, column: Int) -> BoardPremium =
         LiterakiBoardLayout::premiumAt
 ) {
-    fun score(board: BoardState, move: BoardMove): Int = explain(board, move).total
+    /**
+     * Szybka ścieżka używana przy porównywaniu kandydatów.
+     * Nie tworzy listy szczegółów ani listy punktów słów poprzecznych.
+     */
+    fun score(board: BoardState, move: BoardMove): Int {
+        require(move.placements.isNotEmpty()) { "Ruch nie zawiera nowych płytek." }
+        val newTiles = indexNewTiles(move)
+        val mainPoints = scoreWord(
+            board, move.row, move.column, move.horizontal, move.word.length, newTiles
+        )
+        var crossTotal = 0
+        for (placed in move.placements) {
+            crossTotal += scoreCrossWord(board, placed, newTiles, move.horizontal)
+        }
+        val bonus = if (move.placements.size == LetterRack.MAX_TILES) SEVEN_TILE_BONUS else 0
+        return mainPoints + crossTotal + bonus
+    }
 
     /** Szczegółowy wynik: słowo główne, słowa poprzeczne i bonus za 7 płytek. */
     fun explain(board: BoardState, move: BoardMove): ScoreBreakdown {
         require(move.placements.isNotEmpty()) { "Ruch nie zawiera nowych płytek." }
-        val newTiles = move.placements.associateBy { it.row to it.column }
-        val mainCoordinates = move.word.indices.map { index ->
-            val row = move.row + if (move.horizontal) 0 else index
-            val column = move.column + if (move.horizontal) index else 0
-            row to column
-        }
-        val mainPoints = scoreWord(board, mainCoordinates, newTiles)
+        val newTiles = indexNewTiles(move)
+        val mainPoints = scoreWord(
+            board, move.row, move.column, move.horizontal, move.word.length, newTiles
+        )
         val crossPoints = mutableListOf<Int>()
         for (placed in move.placements) {
-            val coordinates = collectCrossWord(board, placed, newTiles, move.horizontal)
-            if (coordinates.size > 1) crossPoints += scoreWord(board, coordinates, newTiles)
+            val points = scoreCrossWord(board, placed, newTiles, move.horizontal)
+            if (points > 0) crossPoints += points
         }
         val bonus = if (move.placements.size == LetterRack.MAX_TILES) SEVEN_TILE_BONUS else 0
         val details = mutableListOf("Słowo główne ${move.word.uppercase()}: $mainPoints pkt")
@@ -187,17 +200,37 @@ class BoardMoveScorer(
         if (bonus > 0) details += "Bonus za 7 płytek: +$bonus pkt"
         return ScoreBreakdown(mainPoints + crossPoints.sum() + bonus, mainPoints, crossPoints, bonus, details)
     }
+
+    /**
+     * Plansza ma stały rozmiar 15x15, więc płaska tablica indeksowana
+     * row * SIZE + column jest prostsza i tańsza niż mapa z kluczami Pair.
+     */
+    private fun indexNewTiles(move: BoardMove): Array<PlacedTile?> {
+        val indexed = arrayOfNulls<PlacedTile>(BoardState.SIZE * BoardState.SIZE)
+        for (placed in move.placements) {
+            require(inside(placed.row, placed.column)) {
+                "Płytka poza planszą: (${placed.row}, ${placed.column})."
+            }
+            indexed[indexOf(placed.row, placed.column)] = placed
+        }
+        return indexed
+    }
+
     private fun scoreWord(
         board: BoardState,
-        coordinates: List<Pair<Int, Int>>,
-        newTiles: Map<Pair<Int, Int>, PlacedTile>
+        startRow: Int,
+        startColumn: Int,
+        horizontal: Boolean,
+        length: Int,
+        newTiles: Array<PlacedTile?>
     ): Int {
         var lettersTotal = 0
         var wordMultiplier = 1
 
-        for ((row, column) in coordinates) {
-            val key = row to column
-            val newlyPlaced = newTiles[key]
+        for (offset in 0 until length) {
+            val row = startRow + if (horizontal) 0 else offset
+            val column = startColumn + if (horizontal) offset else 0
+            val newlyPlaced = newTiles[indexOf(row, column)]
             val tile = newlyPlaced?.tile ?: board.tileAt(row, column)
                 ?: error("Brak płytki na pozycji ($row, $column).")
             val points = tileColorPoints(tile)
@@ -216,41 +249,49 @@ class BoardMoveScorer(
         return lettersTotal * wordMultiplier
     }
 
-    private fun collectCrossWord(
+    /**
+     * Słowo poprzeczne zawiera dokładnie jedną nową płytkę:
+     * wszystkie nowe płytki ruchu leżą na jednej osi głównego słowa.
+     */
+    private fun scoreCrossWord(
         board: BoardState,
         placed: PlacedTile,
-        newTiles: Map<Pair<Int, Int>, PlacedTile>,
+        newTiles: Array<PlacedTile?>,
         mainHorizontal: Boolean
-    ): List<Pair<Int, Int>> {
+    ): Int {
         val dr = if (mainHorizontal) 1 else 0
         val dc = if (mainHorizontal) 0 else 1
-        var row = placed.row
-        var column = placed.column
+        var startRow = placed.row
+        var startColumn = placed.column
 
-        while (inside(row - dr, column - dc) &&
-            tileAt(board, newTiles, row - dr, column - dc) != null
+        while (inside(startRow - dr, startColumn - dc) &&
+            tileAt(board, newTiles, startRow - dr, startColumn - dc) != null
         ) {
-            row -= dr
-            column -= dc
+            startRow -= dr
+            startColumn -= dc
         }
 
-        val result = mutableListOf<Pair<Int, Int>>()
-        while (inside(row, column) &&
-            tileAt(board, newTiles, row, column) != null
-        ) {
-            result += row to column
+        var length = 0
+        var row = startRow
+        var column = startColumn
+        while (inside(row, column) && tileAt(board, newTiles, row, column) != null) {
+            length++
             row += dr
             column += dc
         }
-        return result
+
+        if (length <= 1) return 0
+        return scoreWord(board, startRow, startColumn, !mainHorizontal, length, newTiles)
     }
 
     private fun tileAt(
         board: BoardState,
-        newTiles: Map<Pair<Int, Int>, PlacedTile>,
+        newTiles: Array<PlacedTile?>,
         row: Int,
         column: Int
-    ): BoardTile? = newTiles[row to column]?.tile ?: board.tileAt(row, column)
+    ): BoardTile? = newTiles[indexOf(row, column)]?.tile ?: board.tileAt(row, column)
+
+    private fun indexOf(row: Int, column: Int): Int = row * BoardState.SIZE + column
 
     private fun tileColorPoints(tile: BoardTile): Int =
         TileColor.forLetter(tile.letter, tile.isBlank).points
