@@ -12,7 +12,6 @@ object BoardTileTextParser {
     fun parse(text: String): Char? {
         val letters = text.uppercase()
             .filter { it in POLISH_LETTERS }
-            
 
         return letters.singleOrNull()
     }
