@@ -1,7 +1,6 @@
 package com.littleMario.litera
 
 import android.graphics.Bitmap
-import com.google.android.gms.tasks.Task
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
@@ -61,10 +60,24 @@ class BoardTileRecognizer {
                 return
             }
 
-            recognizer.process(image)
+            val recognitionTask = try {
+                recognizer.process(image)
+            } catch (exception: Exception) {
+                onError(exception)
+                return
+            }
+
+            recognitionTask
                 .addOnSuccessListener { text ->
-                    results.add(toCellResult(row, column, text, cells[index]))
-                    recognizeAt(index + 1)
+                    try {
+                        results.add(toCellResult(row, column, text, cells[index]))
+                        recognizeAt(index + 1)
+                    } catch (exception: Exception) {
+                        // Exceptions raised in asynchronous listeners are not
+                        // caught by BoardPhotoAnalyzer's original call stack.
+                        // Forward them so the analyzer can release cell bitmaps.
+                        onError(exception)
+                    }
                 }
                 .addOnFailureListener { exception ->
                     onError(exception)
