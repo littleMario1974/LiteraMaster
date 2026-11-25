@@ -6,50 +6,89 @@ import org.junit.Test
 class BoardMoveScorerTest {
 
     @Test
-    fun scoresMainWordAndWordMultiplier() {
+    fun appliesTripleWordPremiumOnlyWhenNewTileIsPlacedThere() {
         val board = BoardState.empty()
         val move = BoardMove(
             word = "kot",
-            row = 7,
-            column = 6,
+            row = 2,
+            column = 0,
             horizontal = true,
             placements = listOf(
-                PlacedTile(7, 6, BoardTile('K')),
-                PlacedTile(7, 7, BoardTile('O')),
-                PlacedTile(7, 8, BoardTile('T'))
+                PlacedTile(2, 0, BoardTile('K')),
+                PlacedTile(2, 1, BoardTile('O')),
+                PlacedTile(2, 2, BoardTile('T'))
             )
         )
 
-        val scorer = BoardMoveScorer { row, column ->
-            if (row == 7 && column == 7) BoardPremium(wordMultiplier = 2)
-            else BoardPremium.NONE
-        }
-
-        // K=2, O=1, T=2; środkowa premia słowna x2.
-        assertEquals(10, scorer.score(board, move))
+        // Pole (3,1) ma premię 3X: (K=2 + O=1 + T=2) * 3.
+        assertEquals(15, BoardMoveScorer().score(board, move))
     }
 
     @Test
-    fun blankHasZeroPointsEvenOnLetterPremium() {
+    fun matchingTileAndFieldColorsTripleLetterValue() {
         val board = BoardState.empty()
         val move = BoardMove(
-            word = "kot",
-            row = 7,
-            column = 6,
+            word = "fa",
+            row = 0,
+            column = 0,
             horizontal = true,
             placements = listOf(
-                PlacedTile(7, 6, BoardTile('K')),
-                PlacedTile(7, 7, BoardTile('O', isBlank = true)),
-                PlacedTile(7, 8, BoardTile('T'))
+                PlacedTile(0, 0, BoardTile('F')), // czerwona płytka na czerwonym polu
+                PlacedTile(0, 1, BoardTile('A'))
             )
         )
 
-        val scorer = BoardMoveScorer { row, column ->
-            if (row == 7 && column == 7) BoardPremium(letterMultiplier = 3)
-            else BoardPremium.NONE
-        }
+        // F=5, zgodność kolorów daje 5*3; A=1. Pole (1,1) nie ma 3X.
+        assertEquals(16, BoardMoveScorer().score(board, move))
+    }
 
-        assertEquals(4, scorer.score(board, move))
+    @Test
+    fun mismatchedTileAndFieldColorsDoNotGiveLetterPremium() {
+        val board = BoardState.empty()
+        val move = BoardMove(
+            word = "ak",
+            row = 0,
+            column = 0,
+            horizontal = true,
+            placements = listOf(
+                PlacedTile(0, 0, BoardTile('A')), // żółta płytka na czerwonym polu
+                PlacedTile(0, 1, BoardTile('K'))
+            )
+        )
+
+        assertEquals(3, BoardMoveScorer().score(board, move))
+    }
+
+    @Test
+    fun blankHasZeroPointsEvenOnMatchingColorPremium() {
+        val board = BoardState.empty()
+        val move = BoardMove(
+            word = "fa",
+            row = 0,
+            column = 0,
+            horizontal = true,
+            placements = listOf(
+                PlacedTile(0, 0, BoardTile('F', isBlank = true)),
+                PlacedTile(0, 1, BoardTile('A'))
+            )
+        )
+
+        assertEquals(1, BoardMoveScorer().score(board, move))
+    }
+
+    @Test
+    fun previouslyOccupiedPremiumFieldIsNotActivatedAgain() {
+        val board = BoardState.empty().withTile(7, 7, BoardTile('F'))
+        val move = BoardMove(
+            word = "af",
+            row = 7,
+            column = 6,
+            horizontal = true,
+            placements = listOf(PlacedTile(7, 6, BoardTile('A')))
+        )
+
+        // F leży już na czerwonym polu centralnym: liczymy je tylko jako 5 pkt.
+        assertEquals(6, BoardMoveScorer().score(board, move))
     }
 
     @Test
@@ -61,8 +100,9 @@ class BoardMoveScorerTest {
         }
         val move = BoardMove(word, 7, 4, true, placements)
 
+        val scorerWithoutPremiums = BoardMoveScorer { _, _ -> BoardPremium.NONE }
         // A=1, B=3, C=2, D=2, E=1, F=5, G=3 => 17 + 50.
-        assertEquals(67, BoardMoveScorer().score(board, move))
+        assertEquals(67, scorerWithoutPremiums.score(board, move))
     }
 
     @Test
@@ -82,7 +122,22 @@ class BoardMoveScorerTest {
             )
         )
 
-        // Główne KOT = 5; pionowe AOE = 3.
+        // Główne KOT = 5; pionowe AOE = 3. O nie pasuje kolorem do czerwonego środka.
         assertEquals(8, BoardMoveScorer().score(board, move))
+    }
+
+    @Test
+    fun premiumLayoutMatchesProvidedFieldCounts() {
+        assertEquals(
+            mapOf(
+                "3X" to 8,
+                "2X" to 16,
+                "czerwone" to 17,
+                "zielone" to 24,
+                "żółte" to 20,
+                "niebieskie" to 8
+            ),
+            LiterakiBoardLayout.premiumCounts()
+        )
     }
 }
