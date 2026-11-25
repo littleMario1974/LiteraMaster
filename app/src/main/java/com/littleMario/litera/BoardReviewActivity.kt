@@ -423,6 +423,8 @@ class BoardReviewActivity : AppCompatActivity() {
     }
 
     private fun editCell(row: Int, column: Int) {
+        selectedMove = null
+        renderBoard()
         val input = EditText(this).apply {
             hint = "Litera lub puste pole"
             filters = arrayOf(android.text.InputFilter.LengthFilter(1))
