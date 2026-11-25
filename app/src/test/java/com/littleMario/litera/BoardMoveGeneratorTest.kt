@@ -83,4 +83,16 @@ class BoardMoveGeneratorTest {
             move.word == "miś" && move.placements.any { it.tile.isBlank && it.tile.letter == 'Ś' }
         })
     }
+    @Test
+    fun keepsAlternativeBlankAssignments() {
+        val generator = BoardMoveGenerator(dictionary(listOf("miś")))
+        val rack = requireNotNull(LetterRack.parse("MIŚ?"))
+
+        val moves = generator.generate(BoardState.empty(), rack)
+            .filter { it.word == "miś" && it.horizontal && it.row == 7 && it.column == 6 }
+
+        assertTrue(moves.any { it.placements.none { placed -> placed.tile.isBlank } })
+        assertTrue(moves.any { it.placements.any { placed -> placed.tile.isBlank && placed.tile.letter == 'Ś' } })
+    }
+
 }
