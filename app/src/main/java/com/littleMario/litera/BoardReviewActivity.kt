@@ -35,7 +35,10 @@ class BoardReviewActivity : AppCompatActivity() {
     private lateinit var statusText: TextView
     private lateinit var rackInput: EditText
     private lateinit var rackCountText: TextView
+    private lateinit var exchangeCountText: TextView
+    private lateinit var rackAdviceText: TextView
     private lateinit var findMovesButton: Button
+    private var exchangesUsed = 0
     private lateinit var movesText: TextView
     private lateinit var movesActionsContainer: LinearLayout
     private lateinit var previousMoveButton: Button
@@ -148,6 +151,23 @@ class BoardReviewActivity : AppCompatActivity() {
             setPadding(0, 0, 0, dp(6))
         }
         content.addView(rackCountText)
+        exchangeCountText = TextView(this).apply {
+            textSize = 13f
+            setPadding(0, dp(2), 0, dp(4))
+        }
+        content.addView(exchangeCountText)
+        content.addView(Button(this).apply {
+            text = "Zarejestruj wykorzystaną wymianę"
+            setOnClickListener {
+                if (exchangesUsed < LiterakiTileDistribution.MAX_EXCHANGES_PER_PLAYER) {
+                    exchangesUsed++
+                    updateExchangeCounter()
+                } else {
+                    Toast.makeText(this@BoardReviewActivity, "Wykorzystano już 3 wymiany.", Toast.LENGTH_SHORT).show()
+                }
+            }
+        })
+        updateExchangeCounter()
         updateRackCounter()
 
         findMovesButton = Button(this).apply {
@@ -163,6 +183,12 @@ class BoardReviewActivity : AppCompatActivity() {
             setPadding(0, dp(4), 0, dp(10))
         }
         content.addView(movesText)
+        rackAdviceText = TextView(this).apply {
+            text = "Podpowiedź dotycząca wymiany pojawi się po analizie stojaka."
+            textSize = 14f
+            setPadding(dp(8), dp(8), dp(8), dp(12))
+        }
+        content.addView(rackAdviceText)
 
         movesActionsContainer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -399,6 +425,11 @@ class BoardReviewActivity : AppCompatActivity() {
         }
     }
 
+    private fun updateExchangeCounter() {
+        exchangeCountText.text = "Wykorzystane wymiany w tej partii: $exchangesUsed/3. " +
+            "Po rzeczywistej wymianie naciśnij przycisk powyżej."
+    }
+
     private fun findMoves() {
         val rack = LetterRack.parse(rackInput.text.toString())
         if (rack == null || rack.size == 0) {
@@ -416,6 +447,7 @@ class BoardReviewActivity : AppCompatActivity() {
         renderBoard()
         findMovesButton.isEnabled = false
         movesText.text = "Wyszukiwanie ruchów…"
+        rackAdviceText.text = "Obliczanie statystycznej podpowiedzi wymiany…"
         statusText.text = "Analizowanie planszy i stojaka…"
 
         analysisExecutor.execute {
@@ -432,6 +464,9 @@ class BoardReviewActivity : AppCompatActivity() {
                             .thenByDescending { it.first.placements.size }
                             .thenBy { it.first.word }
                     )
+                val exchangeAdvice = RackExchangeAdvisor(simulationsPerCandidate = 80)
+                    .recommend(boardSnapshot, rack, exchangesUsed = exchangesUsed)
+                val bestMoveScore = rankedMoves.firstOrNull()?.second?.total ?: 0
                 runOnUiThread {
                     if (isFinishing || isDestroyed) return@runOnUiThread
                     if (rankedMoves.isEmpty()) {
@@ -465,6 +500,7 @@ class BoardReviewActivity : AppCompatActivity() {
                             }
                         }
                     }
+                    rackAdviceText.text = formatRackAdvice(exchangeAdvice, bestMoveScore)
                     statusText.text = "Wyszukiwanie zakończone."
                     findMovesButton.isEnabled = true
                 }
@@ -472,11 +508,50 @@ class BoardReviewActivity : AppCompatActivity() {
                 runOnUiThread {
                     if (isFinishing || isDestroyed) return@runOnUiThread
                     movesText.text = "Nie udało się wyszukać ruchów: ${error.message ?: "błąd słownika"}"
+                    rackAdviceText.text = "Nie udało się obliczyć podpowiedzi wymiany."
                     statusText.text = "Błąd wyszukiwania."
                     findMovesButton.isEnabled = true
                 }
             }
         }
+    }
+
+    private fun formatRackAdvice(
+        advice: RackExchangeAdvice,
+        bestMoveScore: Int
+    ): String = buildString {
+        append("DORADCA WYMIANY STOJAKA\\n")
+        append("Najlepszy ruch teraz: $bestMoveScore pkt.\\n")
+        append("Szacowane płytki w woreczku: ${advice.estimatedBagTiles}; wymiany wykorzystane: ${3 - advice.exchangesRemaining}/3.\\n")
+        if (!advice.exchangeAllowed) {
+            append("Wymiana niedostępna: ${advice.explanation}")
+            return@buildString
+        }
+
+        // Wstępny próg bezpieczeństwa: nie oddajemy kolejki za wymianę,
+        // jeśli możemy teraz zdobyć więcej niż 10 punktów.
+        val scoreAllowsExchange = bestMoveScore <= MAX_SCORE_FOR_EXCHANGE
+        if (advice.shouldExchange && scoreAllowsExchange) {
+            append("SUGESTIA: rozważ wymianę liter: ")
+            append(advice.exchangeLetters.joinToString(" "))
+            append(".\\nZostaw na stojaku: ")
+            append(advice.keepLetters.joinToString(" ").ifBlank { "nic" })
+            append(".\\nOcena jakości stojaka: ")
+            append("%.2f → %.2f (prognozowana zmiana +%.2f).".format(
+                advice.currentRackQuality,
+                advice.expectedRackQualityAfterExchange,
+                advice.improvement
+            ))
+        } else if (advice.shouldExchange) {
+            append("SUGESTIA: zagraj teraz. Wymiana poprawia statystyczną jakość stojaka, ")
+            append("ale najlepszy dostępny ruch daje więcej niż ")
+            append("$MAX_SCORE_FOR_EXCHANGE pkt, więc na tym etapie nie zalecamy oddawać kolejki.")
+        } else {
+            append("SUGESTIA: zachowaj obecny stojak. ${advice.explanation}")
+        }
+        append("\\n\\nTo model eksperymentalny: zakłada 7 nieznanych płytek przeciwnika ")
+        append("i nie przewiduje jego odpowiedzi. Próg ")
+        append("$MAX_SCORE_FOR_EXCHANGE pkt jest założeniem do późniejszego dostrojenia.")
     }
 
     private fun showPreviewAt(index: Int) {
@@ -677,6 +752,7 @@ class BoardReviewActivity : AppCompatActivity() {
     companion object {
         private const val MAX_IMAGE_SIDE = 2200
         private const val MAX_DISPLAYED_MOVES = 20
+        private const val MAX_SCORE_FOR_EXCHANGE = 10
         private const val POLISH_ALPHABET =
             "AĄBCĆDEĘFGHIJKLŁMNŃOÓPRSŚTUWYZŹŻ"
     }
