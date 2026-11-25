@@ -36,6 +36,8 @@ class BoardReviewActivity : AppCompatActivity() {
     private lateinit var rackCountText: TextView
     private lateinit var findMovesButton: Button
     private lateinit var movesText: TextView
+    private lateinit var movesActionsContainer: LinearLayout
+    private var selectedMove: BoardMove? = null
     private lateinit var boardGrid: GridLayout
     private lateinit var photoPreview: ImageView
 
@@ -147,6 +149,11 @@ class BoardReviewActivity : AppCompatActivity() {
             setPadding(0, dp(4), 0, dp(10))
         }
         content.addView(movesText)
+
+        movesActionsContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        content.addView(movesActionsContainer)
 
         photoPreview = ImageView(this).apply {
             adjustViewBounds = true
@@ -310,6 +317,9 @@ class BoardReviewActivity : AppCompatActivity() {
         }
 
         val boardSnapshot = currentBoard
+        selectedMove = null
+        movesActionsContainer.removeAllViews()
+        renderBoard()
         findMovesButton.isEnabled = false
         movesText.text = "Wyszukiwanie ruchów…"
         statusText.text = "Analizowanie planszy i stojaka…"
@@ -334,6 +344,27 @@ class BoardReviewActivity : AppCompatActivity() {
                         movesText.text = "Nie znaleziono legalnych ruchów dla podanego stojaka."
                     } else {
                         val shown = rankedMoves.take(MAX_DISPLAYED_MOVES)
+                        movesActionsContainer.removeAllViews()
+                        shown.forEachIndexed { index, pair ->
+                            val move = pair.first
+                            val points = pair.second.total
+                            movesActionsContainer.addView(Button(this).apply {
+                                text = "Podgląd ${index + 1}: ${move.word.uppercase()} — $points pkt"
+                                setOnClickListener {
+                                    selectedMove = move
+                                    renderBoard()
+                                    statusText.text = "Podgląd ruchu: ${move.word.uppercase()}. Nowe płytki są zaznaczone na pomarańczowo."
+                                }
+                            })
+                        }
+                        movesActionsContainer.addView(Button(this).apply {
+                            text = "Usuń podgląd ruchu"
+                            setOnClickListener {
+                                selectedMove = null
+                                renderBoard()
+                                statusText.text = "Podgląd ruchu wyłączony."
+                            }
+                        })
                         movesText.text = buildString {
                             append("Znalezione propozycje: ${rankedMoves.size}\n")
                             append("Ranking według punktów (premie Literaków uwzględnione).\n\n")
@@ -374,16 +405,19 @@ class BoardReviewActivity : AppCompatActivity() {
             for (column in 0 until BoardState.SIZE) {
                 val view = cellViews[row][column] ?: continue
                 val tile = currentBoard.tileAt(row, column)
-                view.text = tile?.letter?.uppercaseChar()?.toString() ?: ""
+                val previewTile = selectedMove?.placements?.firstOrNull { it.row == row && it.column == column }?.tile
+                val displayedTile = previewTile ?: tile
+                view.text = displayedTile?.letter?.uppercaseChar()?.toString() ?: ""
                 val unresolved = (row to column) in unresolvedPositions
                 view.setBackgroundColor(
                     when {
+                        previewTile != null -> Color.rgb(255, 170, 70)
                         unresolved -> Color.rgb(255, 224, 130)
                         tile != null -> Color.rgb(255, 255, 255)
                         else -> Color.rgb(225, 235, 240)
                     }
                 )
-                view.setTypeface(null, if (tile != null) Typeface.BOLD else Typeface.NORMAL)
+                view.setTypeface(null, if (displayedTile != null) Typeface.BOLD else Typeface.NORMAL)
             }
         }
     }
