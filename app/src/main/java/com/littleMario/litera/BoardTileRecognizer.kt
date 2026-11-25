@@ -113,12 +113,12 @@ class BoardTileRecognizer {
         text: Text,
         bitmap: Bitmap
     ): BoardCellOcrResult {
-        val confidences = text.textBlocks
-            .flatMap { block -> block.lines }
-            .flatMap { line -> line.elements }
-            .mapNotNull { element -> element.confidence }
-
-        val confidence = confidences.takeIf { it.isNotEmpty() }?.average()?.toFloat()
+        val confidence = BoardOcrConfidence.calculate(
+            text.textBlocks
+                .flatMap { block -> block.lines }
+                .flatMap { line -> line.elements }
+                .map { element -> element.text to element.confidence }
+        )
 
         return BoardCellOcrResult(
             row = row,
