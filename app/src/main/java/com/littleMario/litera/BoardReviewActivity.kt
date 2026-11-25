@@ -58,6 +58,7 @@ class BoardReviewActivity : AppCompatActivity() {
     private var lowConfidencePositions: Set<Pair<Int, Int>> = emptySet()
     private var recognizedTileColors: Map<Pair<Int, Int>, TileColor?> = emptyMap()
     private var recognizedTileConfidences: Map<Pair<Int, Int>, Float> = emptyMap()
+    private var recognizedRawTexts: Map<Pair<Int, Int>, String> = emptyMap()
     private var cellViews: Array<Array<TextView?>> =
         Array(BoardState.SIZE) { arrayOfNulls(BoardState.SIZE) }
 
@@ -317,6 +318,7 @@ class BoardReviewActivity : AppCompatActivity() {
                 lowConfidencePositions = emptySet()
                 recognizedTileColors = emptyMap()
                 recognizedTileConfidences = emptyMap()
+                recognizedRawTexts = emptyMap()
                 colorDiagnosticsText.text = "Diagnostyka kolorów pojawi się po analizie zdjęcia."
                 renderBoard()
                 photoPreview.setImageBitmap(decoded)
@@ -352,6 +354,9 @@ class BoardReviewActivity : AppCompatActivity() {
                         recognizedTileConfidences = analysis.cellResults
                             .filter { it.letter != null && it.confidence != null }
                             .associate { (it.row to it.column) to it.confidence!! }
+                        recognizedRawTexts = analysis.cellResults
+                            .filter { it.rawText.isNotBlank() }
+                            .associate { (it.row to it.column) to it.rawText }
                         updateColorDiagnostics(colorDiagnostics)
                         renderBoard()
                         val detectedBlanks = analysis.recognizedBoard.occupiedTiles()
@@ -582,9 +587,12 @@ class BoardReviewActivity : AppCompatActivity() {
         val confidenceDescription = detectedConfidence?.let {
             "\nPewność OCR: ${"%.0f".format(it * 100)}%."
         } ?: "\nBrak danych o pewności OCR."
+        val rawTextDescription = recognizedRawTexts[row to column]?.let {
+            "\nSurowy odczyt OCR: ‘$it’."
+        } ?: "\nOCR nie odczytał tekstu z tego pola."
         AlertDialog.Builder(this)
             .setTitle("Pole ${row + 1}, ${column + 1}")
-            .setMessage("Wpisz literę, którą zastępuje płytka. Blank na planszy również ma przypisaną literę.$colorDescription$confidenceDescription")
+            .setMessage("Wpisz literę, którą zastępuje płytka. Blank na planszy również ma przypisaną literę.$colorDescription$confidenceDescription$rawTextDescription")
             .setView(editor)
             .setNegativeButton("Anuluj", null)
             .setNeutralButton("Wyczyść") { _, _ ->
@@ -593,6 +601,7 @@ class BoardReviewActivity : AppCompatActivity() {
                 suspectedBlankPositions = suspectedBlankPositions - (row to column)
                 lowConfidencePositions = lowConfidencePositions - (row to column)
                 recognizedTileConfidences = recognizedTileConfidences - (row to column)
+                recognizedRawTexts = recognizedRawTexts - (row to column)
                 renderBoard()
             }
             .setPositiveButton("Zapisz") { _, _ ->
