@@ -57,6 +57,7 @@ class BoardReviewActivity : AppCompatActivity() {
     private var suspectedBlankPositions: Set<Pair<Int, Int>> = emptySet()
     private var lowConfidencePositions: Set<Pair<Int, Int>> = emptySet()
     private var recognizedTileColors: Map<Pair<Int, Int>, TileColor?> = emptyMap()
+    private var recognizedTileConfidences: Map<Pair<Int, Int>, Float> = emptyMap()
     private var cellViews: Array<Array<TextView?>> =
         Array(BoardState.SIZE) { arrayOfNulls(BoardState.SIZE) }
 
@@ -315,6 +316,7 @@ class BoardReviewActivity : AppCompatActivity() {
                 suspectedBlankPositions = emptySet()
                 lowConfidencePositions = emptySet()
                 recognizedTileColors = emptyMap()
+                recognizedTileConfidences = emptyMap()
                 colorDiagnosticsText.text = "Diagnostyka kolorów pojawi się po analizie zdjęcia."
                 renderBoard()
                 photoPreview.setImageBitmap(decoded)
@@ -347,6 +349,9 @@ class BoardReviewActivity : AppCompatActivity() {
                         recognizedTileColors = analysis.cellResults
                             .filter { it.letter != null }
                             .associate { (it.row to it.column) to it.tileColor }
+                        recognizedTileConfidences = analysis.cellResults
+                            .filter { it.letter != null && it.confidence != null }
+                            .associate { (it.row to it.column) to it.confidence!! }
                         updateColorDiagnostics(colorDiagnostics)
                         renderBoard()
                         val detectedBlanks = analysis.recognizedBoard.occupiedTiles()
@@ -568,14 +573,18 @@ class BoardReviewActivity : AppCompatActivity() {
         }
 
         val detectedColor = recognizedTileColors[row to column]
+        val detectedConfidence = recognizedTileConfidences[row to column]
         val colorDescription = if ((row to column) in recognizedTileColors) {
             "\nKolor odczytany ze zdjęcia: ${colorName(detectedColor)}."
         } else {
             "\nBrak rozpoznanego koloru dla tego pola."
         }
+        val confidenceDescription = detectedConfidence?.let {
+            "\\nPewność OCR: ${"%.0f".format(it * 100)}%."
+        } ?: "\\nBrak danych o pewności OCR."
         AlertDialog.Builder(this)
             .setTitle("Pole ${row + 1}, ${column + 1}")
-            .setMessage("Wpisz literę, którą zastępuje płytka. Blank na planszy również ma przypisaną literę.$colorDescription")
+            .setMessage("Wpisz literę, którą zastępuje płytka. Blank na planszy również ma przypisaną literę.$colorDescription$confidenceDescription")
             .setView(editor)
             .setNegativeButton("Anuluj", null)
             .setNeutralButton("Wyczyść") { _, _ ->
@@ -583,6 +592,7 @@ class BoardReviewActivity : AppCompatActivity() {
                 unresolvedPositions = unresolvedPositions - (row to column)
                 suspectedBlankPositions = suspectedBlankPositions - (row to column)
                 lowConfidencePositions = lowConfidencePositions - (row to column)
+                recognizedTileConfidences = recognizedTileConfidences - (row to column)
                 renderBoard()
             }
             .setPositiveButton("Zapisz") { _, _ ->
@@ -600,6 +610,8 @@ class BoardReviewActivity : AppCompatActivity() {
                 }
                 unresolvedPositions = unresolvedPositions - (row to column)
                 suspectedBlankPositions = suspectedBlankPositions - (row to column)
+                lowConfidencePositions = lowConfidencePositions - (row to column)
+                recognizedTileConfidences = recognizedTileConfidences - (row to column)
                 renderBoard()
             }
             .show()
