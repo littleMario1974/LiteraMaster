@@ -520,9 +520,9 @@ class BoardReviewActivity : AppCompatActivity() {
         advice: RackExchangeAdvice,
         bestMoveScore: Int
     ): String = buildString {
-        append("DORADCA WYMIANY STOJAKA\\n")
-        append("Najlepszy ruch teraz: $bestMoveScore pkt.\\n")
-        append("Szacowane płytki w woreczku: ${advice.estimatedBagTiles}; wymiany wykorzystane: ${3 - advice.exchangesRemaining}/3.\\n")
+        append("DORADCA WYMIANY STOJAKA\n")
+        append("Najlepszy ruch teraz: $bestMoveScore pkt.\n")
+        append("Szacowane płytki w woreczku: ${advice.estimatedBagTiles}; wymiany wykorzystane: ${3 - advice.exchangesRemaining}/3.\n")
         if (!advice.exchangeAllowed) {
             append("Wymiana niedostępna: ${advice.explanation}")
             return@buildString
@@ -534,9 +534,9 @@ class BoardReviewActivity : AppCompatActivity() {
         if (advice.shouldExchange && scoreAllowsExchange) {
             append("SUGESTIA: rozważ wymianę liter: ")
             append(advice.exchangeLetters.joinToString(" "))
-            append(".\\nZostaw na stojaku: ")
+            append(".\nZostaw na stojaku: ")
             append(advice.keepLetters.joinToString(" ").ifBlank { "nic" })
-            append(".\\nOcena jakości stojaka: ")
+            append(".\nOcena jakości stojaka: ")
             append("%.2f → %.2f (prognozowana zmiana +%.2f).".format(
                 advice.currentRackQuality,
                 advice.expectedRackQualityAfterExchange,
@@ -549,7 +549,7 @@ class BoardReviewActivity : AppCompatActivity() {
         } else {
             append("SUGESTIA: zachowaj obecny stojak. ${advice.explanation}")
         }
-        append("\\n\\nTo model eksperymentalny: zakłada 7 nieznanych płytek przeciwnika ")
+        append("\n\nTo model eksperymentalny: zakłada 7 nieznanych płytek przeciwnika ")
         append("i nie przewiduje jego odpowiedzi. Próg ")
         append("$MAX_SCORE_FOR_EXCHANGE pkt jest założeniem do późniejszego dostrojenia.")
     }
