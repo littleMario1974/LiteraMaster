@@ -19,7 +19,8 @@ data class BoardCellOcrResult(
     val column: Int,
     val letter: Char?,
     val rawText: String,
-    val confidence: Float?
+    val confidence: Float?,
+    val tileColor: TileColor? = null
 )
 
 /**
@@ -62,7 +63,7 @@ class BoardTileRecognizer {
 
             recognizer.process(image)
                 .addOnSuccessListener { text ->
-                    results.add(toCellResult(row, column, text))
+                    results.add(toCellResult(row, column, text, cells[index]))
                     recognizeAt(index + 1)
                 }
                 .addOnFailureListener { exception ->
@@ -77,10 +78,40 @@ class BoardTileRecognizer {
         recognizer.close()
     }
 
+    /**
+     * Próbkuje cztery narożne fragmenty pola, z dala od nadrukowanej litery.
+     * Kolor jest wskazówką, nie zastępuje ręcznej kontroli zdjęcia.
+     */
+    private fun recognizeTileColorFromCorners(bitmap: Bitmap): TileColor? {
+        if (bitmap.width < 8 || bitmap.height < 8) return null
+        val pixels = mutableListOf<Int>()
+        val patchWidth = (bitmap.width * 0.12f).toInt().coerceAtLeast(2)
+        val patchHeight = (bitmap.height * 0.12f).toInt().coerceAtLeast(2)
+        val left = (bitmap.width * 0.18f).toInt()
+        val right = (bitmap.width * 0.70f).toInt()
+        val top = (bitmap.height * 0.18f).toInt()
+        val bottom = (bitmap.height * 0.70f).toInt()
+        for (startY in listOf(top, bottom)) {
+            for (startX in listOf(left, right)) {
+                for (y in startY until (startY + patchHeight).coerceAtMost(bitmap.height)) {
+                    for (x in startX until (startX + patchWidth).coerceAtMost(bitmap.width)) {
+                        pixels += bitmap.getPixel(x, y)
+                    }
+                }
+            }
+        }
+        if (pixels.isEmpty()) return null
+        val red = pixels.map { android.graphics.Color.red(it) }.average().toInt()
+        val green = pixels.map { android.graphics.Color.green(it) }.average().toInt()
+        val blue = pixels.map { android.graphics.Color.blue(it) }.average().toInt()
+        return BoardTileColorClassifier.classify(red, green, blue)
+    }
+
     private fun toCellResult(
         row: Int,
         column: Int,
-        text: Text
+        text: Text,
+        bitmap: Bitmap
     ): BoardCellOcrResult {
         val confidences = text.textBlocks
             .flatMap { block -> block.lines }
@@ -94,7 +125,8 @@ class BoardTileRecognizer {
             column = column,
             letter = BoardTileTextParser.parse(text.text),
             rawText = text.text,
-            confidence = confidence
+            confidence = confidence,
+            tileColor = recognizeTileColorFromCorners(bitmap)
         )
     }
 }
