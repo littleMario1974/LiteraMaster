@@ -262,6 +262,6 @@ class RackExchangeAdvisor(
         return quality
     }
 
-    private const val TILE_LETTERS = "AĄBCĆDEĘFGHIJKLŁMNNŃOÓPRSŚTUWYZŹŻ?"
+    private const val TILE_LETTERS = "AĄBCĆDEĘFGHIJKLŁMNŃOÓPRSŚTUWYZŹŻ?"
 
 }
