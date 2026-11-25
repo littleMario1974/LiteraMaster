@@ -262,6 +262,8 @@ class RackExchangeAdvisor(
         return quality
     }
 
-    private const val TILE_LETTERS = "AĄBCĆDEĘFGHIJKLŁMNŃOÓPRSŚTUWYZŹŻ?"
+    private companion object {
+        const val TILE_LETTERS = "AĄBCĆDEĘFGHIJKLŁMNŃOÓPRSŚTUWYZŹŻ?"
+    }
 
 }
