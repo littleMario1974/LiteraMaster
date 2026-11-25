@@ -91,6 +91,12 @@ class MainActivity : AppCompatActivity() {
         clearButton = findViewById(R.id.clearButton)
         searchButton = findViewById(R.id.searchButton)
 
+        findViewById<Button>(R.id.boardPhotoButton).setOnClickListener {
+            startActivity(
+                android.content.Intent(this, BoardReviewActivity::class.java)
+            )
+        }
+
         closeButton = findViewById(R.id.closeButton)
         showDescriptionButton = findViewById(R.id.showDescriptionButton)
 
