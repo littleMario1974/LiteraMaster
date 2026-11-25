@@ -332,13 +332,12 @@ class BoardReviewActivity : AppCompatActivity() {
                         currentBoard = analysis.recognizedBoard
                         unresolvedPositions = analysis.unresolvedCells
                             .map { it.row to it.column }.toSet()
-                        suspectedBlankPositions = analysis.cellResults
-                            .filter { it.letter != null && it.tileColor == TileColor.WHITE }
-                            .map { it.row to it.column }.toSet()
+                        val colorDiagnostics = BoardTileColorDiagnostics.from(analysis.cellResults)
+                        suspectedBlankPositions = colorDiagnostics.suspectedBlankPositions
                         recognizedTileColors = analysis.cellResults
                             .filter { it.letter != null }
                             .associate { (it.row to it.column) to it.tileColor }
-                        updateColorDiagnostics(analysis.cellResults)
+                        updateColorDiagnostics(colorDiagnostics)
                         renderBoard()
                         val detectedBlanks = analysis.recognizedBoard.occupiedTiles()
                             .count { it.tile.isBlank }
@@ -592,23 +591,23 @@ class BoardReviewActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun updateColorDiagnostics(results: List<BoardCellOcrResult>) {
-        val occupied = results.filter { it.letter != null }
-        val counts = occupied.groupingBy { it.tileColor }.eachCount()
+    private fun updateColorDiagnostics(diagnostics: BoardTileColorDiagnostics) {
+        val counts = diagnostics.colorCounts
         colorDiagnosticsText.text = buildString {
-            append("Diagnostyka kolorów rozpoznanych płytek (tylko pola z odczytaną literą):\n")
+            append("Diagnostyka kolorów rozpoznanych płytek (tylko pola z odczytaną literą):\\n")
             append("Żółte: ${counts[TileColor.YELLOW] ?: 0}   ")
             append("Zielone: ${counts[TileColor.GREEN] ?: 0}   ")
-            append("Niebieskie: ${counts[TileColor.BLUE] ?: 0}\n")
+            append("Niebieskie: ${counts[TileColor.BLUE] ?: 0}\\n")
             append("Czerwone: ${counts[TileColor.RED] ?: 0}   ")
             append("Białe: ${counts[TileColor.WHITE] ?: 0}   ")
-            append("Nierozpoznane: ${counts[null] ?: 0}\n")
-            if (suspectedBlankPositions.isNotEmpty()) {
+            append("Nierozpoznane: ${counts[null] ?: 0}\\n")
+            if (diagnostics.suspectedBlankPositions.isNotEmpty()) {
                 append("Białe pola do sprawdzenia: ")
-                append(suspectedBlankPositions.sortedWith(compareBy<Pair<Int, Int>> { it.first }.thenBy { it.second })
+                append(diagnostics.suspectedBlankPositions
+                    .sortedWith(compareBy<Pair<Int, Int>> { it.first }.thenBy { it.second })
                     .joinToString { "${it.first + 1},${it.second + 1}" })
             }
-            append("\nKolory są orientacyjne; porównaj je z rzeczywistymi płytkami.")
+            append("\\nKolory są orientacyjne; porównaj je z rzeczywistymi płytkami.")
         }
     }
 
