@@ -221,39 +221,40 @@ class BoardMoveGenerator(
         placements: List<PlacedTile>,
         horizontal: Boolean
     ): Boolean {
+        // All newly placed tiles lie on the main word's line. A perpendicular
+        // cross word can therefore contain only one new tile: the current one.
+        // Read the existing board directly instead of repeatedly searching the
+        // placements list for every cell in every cross word.
+        val dr = if ( horizontal) 1 else 0
+        val dc = if (horizontal) 0 else 1
+
         for (placed in placements) {
-            val dr = if (horizontal) 1 else 0
-            val dc = if (horizontal) 0 else 1
             var startRow = placed.row
             var startColumn = placed.column
             while (inside(startRow - dr, startColumn - dc) &&
-                tileAtWithPlacements(board, placements, startRow - dr, startColumn - dc) != null
+                board.tileAt(startRow - dr, startColumn - dc) != null
             ) {
                 startRow -= dr
                 startColumn -= dc
             }
 
             val word = StringBuilder()
-            var r = startRow
-            var c = startColumn
-            while (inside(r, c)) {
-                val tile = tileAtWithPlacements(board, placements, r, c) ?: break
+            var row = startRow
+            var column = startColumn
+            while (inside(row, column)) {
+                val tile = if (row == placed.row && column == placed.column) {
+                    placed.tile
+                } else {
+                    board.tileAt(row, column)
+                } ?: break
                 word.append(tile.normalizedLetter.lowercaseChar())
-                r += dr
-                c += dc
+                row += dr
+                column += dc
             }
             if (word.length > 1 && !containsWord(word.toString())) return false
         }
         return true
     }
-
-    private fun tileAtWithPlacements(
-        board: BoardState,
-        placements: List<PlacedTile>,
-        row: Int,
-        column: Int
-    ): BoardTile? = placements.firstOrNull { it.row == row && it.column == column }?.tile
-        ?: board.tileAt(row, column)
 
     private fun containsWord(word: String): Boolean {
         var nodeId = rootId
