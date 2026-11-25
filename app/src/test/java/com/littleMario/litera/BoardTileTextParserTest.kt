@@ -13,7 +13,7 @@ class BoardTileTextParserTest {
 
     @Test
     fun parsesLowercasePolishLetter() {
-        assertEquals('ł', BoardTileTextParser.parse("ł"))
+        assertEquals('Ł', BoardTileTextParser.parse("ł"))
     }
 
     @Test
@@ -29,5 +29,10 @@ class BoardTileTextParserTest {
     @Test
     fun returnsNullWhenMoreThanOneDifferentLetterIsFound() {
         assertNull(BoardTileTextParser.parse("MI"))
+    }
+
+    @Test
+    fun returnsNullWhenSameLetterIsReadMoreThanOnce() {
+        assertNull(BoardTileTextParser.parse("AA"))
     }
 }
