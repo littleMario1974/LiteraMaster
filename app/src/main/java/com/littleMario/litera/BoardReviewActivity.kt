@@ -596,19 +596,19 @@ class BoardReviewActivity : AppCompatActivity() {
         val occupied = results.filter { it.letter != null }
         val counts = occupied.groupingBy { it.tileColor }.eachCount()
         colorDiagnosticsText.text = buildString {
-            append("Diagnostyka kolorów rozpoznanych płytek (tylko pola z odczytaną literą):\\n")
+            append("Diagnostyka kolorów rozpoznanych płytek (tylko pola z odczytaną literą):\n")
             append("Żółte: ${counts[TileColor.YELLOW] ?: 0}   ")
             append("Zielone: ${counts[TileColor.GREEN] ?: 0}   ")
-            append("Niebieskie: ${counts[TileColor.BLUE] ?: 0}\\n")
+            append("Niebieskie: ${counts[TileColor.BLUE] ?: 0}\n")
             append("Czerwone: ${counts[TileColor.RED] ?: 0}   ")
             append("Białe: ${counts[TileColor.WHITE] ?: 0}   ")
-            append("Nierozpoznane: ${counts[null] ?: 0}\\n")
+            append("Nierozpoznane: ${counts[null] ?: 0}\n")
             if (suspectedBlankPositions.isNotEmpty()) {
                 append("Białe pola do sprawdzenia: ")
                 append(suspectedBlankPositions.sortedWith(compareBy<Pair<Int, Int>> { it.first }.thenBy { it.second })
                     .joinToString { "${it.first + 1},${it.second + 1}" })
             }
-            append("\\nKolory są orientacyjne; porównaj je z rzeczywistymi płytkami.")
+            append("\nKolory są orientacyjne; porównaj je z rzeczywistymi płytkami.")
         }
     }
 
