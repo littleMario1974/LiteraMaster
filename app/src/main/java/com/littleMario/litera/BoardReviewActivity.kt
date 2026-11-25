@@ -320,27 +320,34 @@ class BoardReviewActivity : AppCompatActivity() {
                     assets.open("dictionary.dawg")
                 ).use { DawgReader().load(it) }.also { cachedDawgNodes = it }
 
-                val moves = BoardMoveGenerator(nodes).generate(boardSnapshot, rack)
+                val scorer = BoardMoveScorer()
+                val rankedMoves = BoardMoveGenerator(nodes).generate(boardSnapshot, rack)
+                    .map { move -> move to scorer.score(boardSnapshot, move) }
+                    .sortedWith(
+                        compareByDescending<Pair<BoardMove, Int>> { it.second }
+                            .thenByDescending { it.first.placements.size }
+                            .thenBy { it.first.word }
+                    )
                 runOnUiThread {
                     if (isFinishing || isDestroyed) return@runOnUiThread
-                    if (moves.isEmpty()) {
+                    if (rankedMoves.isEmpty()) {
                         movesText.text = "Nie znaleziono legalnych ruchów dla podanego stojaka."
                     } else {
-                        val shown = moves.take(MAX_DISPLAYED_MOVES)
+                        val shown = rankedMoves.take(MAX_DISPLAYED_MOVES)
                         movesText.text = buildString {
-                            append("Znalezione propozycje: ${moves.size}\n")
-                            append("Kolejność nie uwzględnia jeszcze punktów za pola premiowe.\n\n")
-                            shown.forEachIndexed { index, move ->
+                            append("Znalezione propozycje: ${rankedMoves.size}\n")
+                            append("Ranking według punktów (premie Literaków uwzględnione).\n\n")
+                            shown.forEachIndexed { index, (move, points) ->
                                 val direction = if (move.horizontal) "poziomo" else "pionowo"
                                 val newTiles = move.placements.joinToString(" ") { placed ->
                                     val mark = if (placed.tile.isBlank) " (blank)" else ""
                                     "${placed.tile.letter}@${placed.row + 1},${placed.column + 1}$mark"
                                 }
-                                append("${index + 1}. ${move.word.uppercase()} — $direction, ")
+                                append("${index + 1}. ${move.word.uppercase()} — **$points pkt** — $direction, ")
                                 append("start ${move.row + 1},${move.column + 1}\n")
                                 append("   Dokładane: $newTiles\n")
                             }
-                            if (moves.size > shown.size) {
+                            if (rankedMoves.size > shown.size) {
                                 append("\nPokazano pierwsze ${shown.size} propozycji.")
                             }
                         }
