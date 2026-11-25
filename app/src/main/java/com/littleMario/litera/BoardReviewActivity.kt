@@ -316,9 +316,9 @@ class BoardReviewActivity : AppCompatActivity() {
 
         analysisExecutor.execute {
             try {
-                val nodes = cachedDawgNodes ?: DawgReader().load(
-                    DataInputStream(assets.open("dictionary.dawg"))
-                ).also { cachedDawgNodes = it }
+                val nodes = cachedDawgNodes ?: DataInputStream(
+                    assets.open("dictionary.dawg")
+                ).use { DawgReader().load(it) }.also { cachedDawgNodes = it }
 
                 val moves = BoardMoveGenerator(nodes).generate(boardSnapshot, rack)
                 runOnUiThread {
