@@ -250,6 +250,12 @@ class BoardReviewActivity : AppCompatActivity() {
         }
         content.addView(boardGrid)
 
+        content.addView(TextView(this).apply {
+            text = "Legenda planszy:  * — blank potwierdzony ręcznie   •   ? — możliwy blank (biała płytka)   •   ! — niska pewność OCR (<65%)"
+            textSize = 12f
+            setPadding(dp(4), dp(6), dp(4), dp(2))
+        })
+
         colorDiagnosticsText = TextView(this).apply {
             text = "Diagnostyka kolorów pojawi się po analizie zdjęcia."
             textSize = 13f
