@@ -7,31 +7,34 @@ import org.junit.Test
 class BoardTilePresenceDetectorTest {
 
     @Test
-    fun acceptsLargeColoredTileCoveringAlmostWholeCell() {
+    fun acceptsTileAfterCellInset() {
+        // Tile covering roughly 72% of the cropped cell, with some
+        // area lost to the printed letter, glare and perspective.
         assertTrue(
             BoardTilePresenceDetector.isLikelyTileMetrics(
                 width = 96,
                 height = 96,
-                minX = 2,
-                minY = 3,
-                maxX = 93,
-                maxY = 92,
-                coloredPixels = 4_800
+                minX = 13,
+                minY = 14,
+                maxX = 82,
+                maxY = 81,
+                coloredPixels = 2_500
             )
         )
     }
 
     @Test
-    fun rejectsSmallPremiumSquareEvenWhenItsColorIsStrong() {
+    fun rejectsSmallerPrintedPremiumMarking() {
+        // A printed premium square is substantially smaller than a tile.
         assertFalse(
             BoardTilePresenceDetector.isLikelyTileMetrics(
                 width = 96,
                 height = 96,
-                minX = 10,
-                minY = 11,
-                maxX = 85,
-                maxY = 84,
-                coloredPixels = 3_900
+                minX = 25,
+                minY = 26,
+                maxX = 70,
+                maxY = 69,
+                coloredPixels = 1_200
             )
         )
     }
