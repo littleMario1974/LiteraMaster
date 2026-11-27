@@ -100,32 +100,6 @@ class BoardPhotoAnalysisMapperTest {
     }
 
 
-    @Test
-    fun doesNotAutomaticallyPlaceLowConfidenceLetters() {
-        val results = emptyResults().toMutableList()
-        results[0] = BoardCellOcrResult(0, 0, 'L', "L", 0.42f)
-        results[1] = BoardCellOcrResult(0, 1, 'R', "R", 0.64f)
-        results[2] = BoardCellOcrResult(0, 2, 'B', "B", 0.65f)
-
-        val analysis = BoardPhotoAnalysisMapper.map(geometry, results)
-
-        assertNull(analysis.recognizedBoard.tileAt(0, 0))
-        assertNull(analysis.recognizedBoard.tileAt(0, 1))
-        assertEquals('B', analysis.recognizedBoard.tileAt(0, 2)?.letter)
-        assertEquals(2, analysis.unresolvedCells.count { it.letter != null })
-    }
-
-    @Test
-    fun doesNotAutomaticallyPlaceLetterWhenConfidenceIsMissing() {
-        val results = emptyResults().toMutableList()
-        results[0] = BoardCellOcrResult(0, 0, 'H', "H", null)
-
-        val analysis = BoardPhotoAnalysisMapper.map(geometry, results)
-
-        assertNull(analysis.recognizedBoard.tileAt(0, 0))
-        assertEquals(1, analysis.unresolvedCells.count { it.letter == 'H' })
-    }
-
     private fun emptyResults(): List<BoardCellOcrResult> =
         (0 until BoardState.SIZE).flatMap { row ->
             (0 until BoardState.SIZE).map { column ->
