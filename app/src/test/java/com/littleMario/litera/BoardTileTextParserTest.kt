@@ -17,8 +17,15 @@ class BoardTileTextParserTest {
     }
 
     @Test
-    fun ignoresTileScoreDigits() {
+    fun allowsTrailingTileScoreDigits() {
         assertEquals('Ż', BoardTileTextParser.parse("Ż 10"))
+    }
+
+    @Test
+    fun rejectsPremiumSquareLabels() {
+        assertNull(BoardTileTextParser.parse("2L"))
+        assertNull(BoardTileTextParser.parse("3S"))
+        assertNull(BoardTileTextParser.parse("2 x L"))
     }
 
     @Test
