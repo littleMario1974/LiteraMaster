@@ -41,9 +41,34 @@ object BoardTilePresenceDetector {
 
         if (coloredPixels == 0) return false
 
-        val widthSpan = (maxX - minX + 1).toFloat() / bitmap.width
-        val heightSpan = (maxY - minY + 1).toFloat() / bitmap.height
-        val coverage = coloredPixels.toFloat() / (bitmap.width * bitmap.height)
+        return isLikelyTileMetrics(
+            bitmap.width,
+            bitmap.height,
+            minX,
+            minY,
+            maxX,
+            maxY,
+            coloredPixels
+        )
+    }
+
+    internal fun isLikelyTileMetrics(
+        width: Int,
+        height: Int,
+        minX: Int,
+        minY: Int,
+        maxX: Int,
+        maxY: Int,
+        coloredPixels: Int
+    ): Boolean {
+        if (width <= 0 || height <= 0 || coloredPixels <= 0 ||
+            minX < 0 || minY < 0 || maxX < minX || maxY < minY ||
+            maxX >= width || maxY >= height
+        ) return false
+
+        val widthSpan = (maxX - minX + 1).toFloat() / width
+        val heightSpan = (maxY - minY + 1).toFloat() / height
+        val coverage = coloredPixels.toFloat() / (width * height)
 
         return widthSpan >= MIN_SPAN &&
             heightSpan >= MIN_SPAN &&
