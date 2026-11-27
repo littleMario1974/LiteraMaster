@@ -47,6 +47,25 @@ class BoardTileRecognizer {
             val original = cells[index]
             val row = index / BoardState.SIZE
             val column = index % BoardState.SIZE
+
+            // Najpierw sprawdzamy, czy pole zawiera dużą płytkę.
+            // Małe nadruki 2x/3x na planszy nie przechodzą tego testu,
+            // więc ich cyfry i symbole nigdy nie trafiają do OCR.
+            if (!BoardTilePresenceDetector.isLikelyTile(original)) {
+                results.add(
+                    BoardCellOcrResult(
+                        row = row,
+                        column = column,
+                        letter = null,
+                        rawText = "",
+                        confidence = null,
+                        tileColor = null
+                    )
+                )
+                recognizeAt(index + 1)
+                return
+            }
+
             val variants = try {
                 BoardOcrImagePreprocessor.createVariants(original)
             } catch (exception: Exception) {
