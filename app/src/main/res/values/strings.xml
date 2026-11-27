@@ -1,6 +1,6 @@
 <resources>
 <string name="close_button">Close</string>
-    <string name="app_name">Litera</string>
+    <string name="app_name">LiteraMaster</string>
 
     <string name="program_description_html"><![CDATA[
 Aplikacja służy do wyszukiwania słów na podstawie liter i filtrów.
