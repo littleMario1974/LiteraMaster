@@ -20,8 +20,8 @@ import kotlin.math.sqrt
  */
 class BoardImageDetector(
     private val minimumBoardAreaRatio: Double = 0.04,
-    private val minimumAspectRatio: Double = 0.45,
-    private val maximumAspectRatio: Double = 2.20,
+    private val minimumAspectRatio: Double = 0.60,
+    private val maximumAspectRatio: Double = 1.65,
     private val maximumProcessingSide: Int = 1800
 ) {
     init {
