@@ -25,8 +25,6 @@ data class BoardPhotoAnalysis(
  */
 object BoardPhotoAnalysisMapper {
 
-    private const val MIN_AUTO_ACCEPT_CONFIDENCE = 0.65f
-
     fun map(
         geometry: BoardGridGeometry,
         cellResults: List<BoardCellOcrResult>
@@ -58,14 +56,12 @@ object BoardPhotoAnalysisMapper {
                 val result = byPosition.getValue(row to column)
                 val letter = result.letter
 
-                if (letter != null && (result.confidence ?: 0f) >= MIN_AUTO_ACCEPT_CONFIDENCE) {
-                    // Automatycznie wpisujemy wyłącznie litery o pewności >= 65%.
-                    // Słabsze odczyty (często nadruki pól premiowych) wymagają
-                    // ręcznego potwierdzenia zamiast zanieczyszczać planszę.
+                if (letter != null) {
+                    // Zachowujemy wszystkie odczytane litery; poziom pewności
+                    // jest sygnalizowany użytkownikowi, a nie używany do ich
+                    // całkowitego odrzucania.
                     board = board.withTile(row, column, BoardTile(letter))
                 } else {
-                    // Puste, niejednoznaczne i mało pewne odczyty pozostają
-                    // do ręcznej weryfikacji.
                     unresolved += result
                 }
             }
