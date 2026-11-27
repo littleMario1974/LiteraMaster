@@ -77,6 +77,6 @@ object BoardTilePresenceDetector {
 
     private const val MIN_SATURATION = 0.24f
     private const val MIN_BRIGHTNESS = 0.20f
-    private const val MIN_SPAN = 0.84f
-    private const val MIN_COLORED_COVERAGE = 0.30f
+    private const val MIN_SPAN = 0.62f
+    private const val MIN_COLORED_COVERAGE = 0.22f
 }
