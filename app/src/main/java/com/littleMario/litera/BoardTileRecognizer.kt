@@ -138,11 +138,12 @@ class BoardTileRecognizer {
             .flatMap { it.elements }
             .filter { BoardTileTextParser.parse(it.text) != null }
             .mapNotNull { it.boundingBox }
+            .filter { BoardGlyphFilter.isTileSized(it.height(), 96) }
         return boxes.maxOfOrNull { box ->
             val height = box.height().toFloat() / 96f
             val width = box.width().toFloat() / 96f
-            // Wysokość znaku jest ważniejsza niż szerokość; pole premiowe
-            // ma zwykle znacznie mniejszy nadruk niż litera na płytce.
+            // Wysokość znaku jest ważniejsza niż szerokość; mały nadruk
+            // premii nie może wygrać z literą na płytce.
             height * 0.8f + width * 0.2f
         } ?: 0f
     }
@@ -193,19 +194,46 @@ class BoardTileRecognizer {
         text: Text,
         originalBitmap: Bitmap
     ): BoardCellOcrResult {
-        val confidence = BoardOcrConfidence.calculate(
-            text.textBlocks
-                .flatMap { block -> block.lines }
-                .flatMap { line -> line.elements }
-                .map { element -> element.text to element.confidence }
-        )
+        // Nie parsujemy całego tekstu pola jako jednej etykiety. ML Kit
+        // zwraca osobne elementy z ramkami; do planszy trafia wyłącznie
+        // pojedyncza litera o rozmiarze zbliżonym do nadruku na płytce.
+        // Małe nadruki 2L/3S i ich błędne odczyty jako L/S są odrzucane.
+        val letterElement = text.textBlocks
+            .flatMap { block -> block.lines }
+            .flatMap { line -> line.elements }
+            .mapNotNull { element ->
+                val letter = BoardTileTextParser.parse(element.text) ?: return@mapNotNull null
+                val box = element.boundingBox ?: return@mapNotNull null
+                if (!BoardGlyphFilter.isTileSized(box.height(), originalBitmap.height)) {
+                    return@mapNotNull null
+                }
+                Triple(letter, element, box.height())
+            }
+            .maxByOrNull { it.third }
+
         return BoardCellOcrResult(
             row = row,
             column = column,
-            letter = BoardTileTextParser.parse(text.text),
+            letter = letterElement?.first,
             rawText = text.text,
-            confidence = confidence,
+            confidence = letterElement?.second?.confidence,
             tileColor = recognizeTileColorFromCorners(originalBitmap)
         )
+    }
+}
+
+
+/**
+ * Odrzuca małe znaki nadrukowane bezpośrednio na planszy.
+ * W wyprostowanym polu litera na płytce zajmuje wyraźnie większą
+ * część wysokości niż oznaczenie premii. Brak wyniku oznacza pole
+ * nierozstrzygnięte, a nie automatycznie puste.
+ */
+internal object BoardGlyphFilter {
+    private const val MIN_TILE_GLYPH_HEIGHT_RATIO = 0.30f
+
+    fun isTileSized(glyphHeight: Int, cellHeight: Int): Boolean {
+        if (glyphHeight <= 0 || cellHeight <= 0) return false
+        return glyphHeight.toFloat() / cellHeight >= MIN_TILE_GLYPH_HEIGHT_RATIO
     }
 }
