@@ -48,24 +48,9 @@ class BoardTileRecognizer {
             val row = index / BoardState.SIZE
             val column = index % BoardState.SIZE
 
-            // Najpierw sprawdzamy, czy pole zawiera dużą płytkę.
-            // Małe nadruki 2x/3x na planszy nie przechodzą tego testu,
-            // więc ich cyfry i symbole nigdy nie trafiają do OCR.
-            if (!BoardTilePresenceDetector.isLikelyTile(original)) {
-                results.add(
-                    BoardCellOcrResult(
-                        row = row,
-                        column = column,
-                        letter = null,
-                        rawText = "",
-                        confidence = null,
-                        tileColor = null
-                    )
-                )
-                recognizeAt(index + 1)
-                return
-            }
-
+            // Nie odrzucamy pola na podstawie samego koloru. Płytki mogą
+            // być białe, żółte lub mieć tło premii pod spodem; filtr HSV
+            // powodował pomijanie prawdziwych liter.
             val variants = try {
                 BoardOcrImagePreprocessor.createVariants(original)
             } catch (exception: Exception) {
@@ -74,6 +59,7 @@ class BoardTileRecognizer {
             }
 
             var bestResult: BoardCellOcrResult? = null
+            var currentGlyphScore = 0f
 
             fun recycleVariants() {
                 variants.forEach { bitmap ->
@@ -111,21 +97,16 @@ class BoardTileRecognizer {
                                 val candidate = toCellResult(row, column, text, original)
                                 val current = bestResult
                                 if (current == null ||
-                                    (candidate.letter != null && current.letter == null) ||
-                                    ((candidate.confidence ?: 0f) > (current.confidence ?: 0f))
+                                    candidateGlyphScore(text) > currentGlyphScore
                                 ) {
                                     bestResult = candidate
+                                    currentGlyphScore = candidateGlyphScore(text)
                                 }
 
-                                // Jeśli kontrastowa szarość dała literę,
-                                // nie ma potrzeby ryzykować utraty szczegółów binaryzacją.
-                                if (candidate.letter != null) {
-                                    results.add(candidate)
-                                    recycleVariants()
-                                    recognizeAt(index + 1)
-                                } else {
-                                    recognizeVariant(variantIndex + 1)
-                                }
+                                // Sprawdzamy wszystkie warianty. Pierwszy odczyt
+                                // może być małym nadrukiem premii; większy obszar
+                                // znaku częściej odpowiada literze na płytce.
+                                recognizeVariant(variantIndex + 1)
                             } catch (exception: Exception) {
                                 recycleVariants()
                                 onError(exception)
@@ -149,6 +130,21 @@ class BoardTileRecognizer {
 
     fun close() {
         recognizer.close()
+    }
+
+    private fun candidateGlyphScore(text: Text): Float {
+        val boxes = text.textBlocks
+            .flatMap { it.lines }
+            .flatMap { it.elements }
+            .filter { BoardTileTextParser.parse(it.text) != null }
+            .mapNotNull { it.boundingBox }
+        return boxes.maxOfOrNull { box ->
+            val height = box.height().toFloat() / 96f
+            val width = box.width().toFloat() / 96f
+            // Wysokość znaku jest ważniejsza niż szerokość; pole premiowe
+            // ma zwykle znacznie mniejszy nadruk niż litera na płytce.
+            height * 0.8f + width * 0.2f
+        } ?: 0f
     }
 
     private fun recognizeTileColorFromCorners(bitmap: Bitmap): TileColor? {
