@@ -44,7 +44,7 @@ class BoardCellImageExtractor(
         val boardPixels = BoardState.SIZE * RECTIFIED_CELL_SIZE
         val sourceMat = Mat()
         val rectifiedMat = Mat()
-        val transform = Mat()
+        val transform = Imgproc.getPerspectiveTransform(sourceCorners, targetCorners)
         val sourceCorners = MatOfPoint2f(
             Point(geometry.topLeft.x, geometry.topLeft.y),
             Point(geometry.topRight.x, geometry.topRight.y),
@@ -61,7 +61,6 @@ class BoardCellImageExtractor(
 
         try {
             Utils.bitmapToMat(source, sourceMat)
-            Imgproc.getPerspectiveTransform(sourceCorners, targetCorners, transform)
             Imgproc.warpPerspective(
                 sourceMat,
                 rectifiedMat,
