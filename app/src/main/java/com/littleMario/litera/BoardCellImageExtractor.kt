@@ -44,7 +44,6 @@ class BoardCellImageExtractor(
         val boardPixels = BoardState.SIZE * RECTIFIED_CELL_SIZE
         val sourceMat = Mat()
         val rectifiedMat = Mat()
-        val transform = Imgproc.getPerspectiveTransform(sourceCorners, targetCorners)
         val sourceCorners = MatOfPoint2f(
             Point(geometry.topLeft.x, geometry.topLeft.y),
             Point(geometry.topRight.x, geometry.topRight.y),
@@ -57,6 +56,7 @@ class BoardCellImageExtractor(
             Point((boardPixels - 1).toDouble(), (boardPixels - 1).toDouble()),
             Point(0.0, (boardPixels - 1).toDouble())
         )
+        val transform = Imgproc.getPerspectiveTransform(sourceCorners, targetCorners)
         var rectifiedBitmap: Bitmap? = null
 
         try {
