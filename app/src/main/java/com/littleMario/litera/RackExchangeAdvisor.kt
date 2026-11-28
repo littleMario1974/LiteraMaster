@@ -95,7 +95,7 @@ class RackExchangeAdvisor(
             )
         }
 
-        val unseen = unseenTiles.toMutableList()
+        val unseen = unseenTiles.toCharArray()
         var bestMask = 0
         var bestExpectedQuality = currentQuality
 
@@ -105,20 +105,43 @@ class RackExchangeAdvisor(
             val exchangeCount = Integer.bitCount(mask)
             if (exchangeCount > estimatedBagTiles) continue
 
-            val retained = rack.letters.filterIndexed { index, _ ->
-                mask and (1 shl index) == 0
+            // Bufory są tworzone raz na kandydata, a nie dla każdej symulacji.
+            // Zachowujemy osobny generator z dotychczasowym ziarnem dla każdej próby,
+            // dzięki czemu wyniki pozostają powtarzalne i zgodne z poprzednią logiką.
+            val retainedCount = rack.size - exchangeCount
+            val candidateRack = CharArray(rack.size)
+            var retainedIndex = 0
+            for (index in rack.letters.indices) {
+                if (mask and (1 shl index) == 0) {
+                    candidateRack[retainedIndex++] = rack.letters[index].uppercaseChar()
+                }
             }
+            val sample = unseen.copyOf()
+            val qualityCounts = IntArray(TILE_LETTERS.length)
+            val sampleSize = opponentRackSize + exchangeCount
             var qualityTotal = 0.0
 
             repeat(simulationsPerCandidate) { simulation ->
-                val shuffled = unseen.toMutableList()
-                shuffled.shuffle(Random(randomSeed + mask * 1009 + simulation))
+                // Przywracamy woreczek do stanu początkowego bez kolejnej alokacji.
+                unseen.copyInto(sample)
 
-                // Nieznany stojak przeciwnika traktujemy jako losową rezerwę.
-                val hiddenOpponentTiles = opponentRackSize.coerceAtMost(shuffled.size)
-                val availableForDraw = shuffled.drop(hiddenOpponentTiles)
-                val drawn = availableForDraw.take(exchangeCount)
-                qualityTotal += rackQuality(retained + drawn)
+                // Wystarczy wylosować pierwsze opponent + exchangeCount pozycji.
+                // Częściowe Fisher-Yates daje taki sam rozkład próby jak pełne tasowanie,
+                // ale nie miesza pozostałych płytek, których ta symulacja nie wykorzysta.
+                val random = Random(randomSeed + mask * 1009 + simulation)
+                for (index in 0 until sampleSize) {
+                    val selectedIndex = random.nextInt(index, sample.size)
+                    val temporary = sample[index]
+                    sample[index] = sample[selectedIndex]
+                    sample[selectedIndex] = temporary
+                }
+
+                // Pierwsze pozycje rezerwujemy dla nieznanego stojaka przeciwnika.
+                var candidateIndex = retainedCount
+                for (index in opponentRackSize until sampleSize) {
+                    candidateRack[candidateIndex++] = sample[index]
+                }
+                qualityTotal += rackQuality(candidateRack, rack.size, qualityCounts)
             }
 
             val expectedQuality = qualityTotal / simulationsPerCandidate
@@ -182,34 +205,65 @@ class RackExchangeAdvisor(
      */
     internal fun rackQuality(letters: List<Char>): Double {
         if (letters.isEmpty()) return 0.0
+        val normalized = CharArray(letters.size) { letters[it].uppercaseChar() }
+        return rackQuality(normalized, normalized.size, IntArray(TILE_LETTERS.length))
+    }
 
-        val normalized = letters.map { it.uppercaseChar() }
-        val vowels = setOf('A', 'Ą', 'E', 'Ę', 'I', 'O', 'Ó', 'U', 'Y')
-        val vowelCount = normalized.count { it in vowels }
-        val targetVowels = letters.size * 0.39
+    /**
+     * Wersja bez kolekcji tymczasowych używana w gorącej pętli symulacji.
+     * Tablicę liczników można ponownie wykorzystać dla kolejnego stojaka.
+     */
+    private fun rackQuality(
+        letters: CharArray,
+        size: Int,
+        counts: IntArray
+    ): Double {
+        if (size == 0) return 0.0
+        counts.fill(0)
+
+        var vowelCount = 0
+        var blankCount = 0
+        var difficultCount = 0
+        var consonantCount = 0
+
+        for (index in 0 until size) {
+            val letter = letters[index].uppercaseChar()
+            when (letter) {
+                'A', 'Ą', 'E', 'Ę', 'I', 'O', 'Ó', 'U', 'Y' -> vowelCount++
+                '?' -> blankCount++
+                else -> consonantCount++
+            }
+            when (letter) {
+                'Ą', 'Ć', 'Ę', 'Ń', 'Ó', 'Ź', 'Ż', 'F' -> difficultCount++
+            }
+
+            val tileIndex = TILE_LETTERS.indexOf(letter)
+            if (tileIndex >= 0 && letter != '?') counts[tileIndex]++
+        }
+
+        val targetVowels = size * 0.39
         var quality = 5.0 - kotlin.math.abs(vowelCount - targetVowels) * 1.55
+        quality += blankCount * 4.2
 
-        quality += normalized.count { it == '?' } * 4.2
-
-        val counts = normalized.filter { it != '?' }.groupingBy { it }.eachCount()
-        counts.forEach { (letter, count) ->
+        for (index in counts.indices) {
+            val count = counts[index]
             if (count > 1) {
                 quality -= (count - 1) * 0.75
                 quality -= (count - 2).coerceAtLeast(0) * 1.0
             }
-            if ((LiterakiTileDistribution.counts[letter] ?: 0) == 1) {
+            if (count > 0 && LiterakiTileDistribution.counts[TILE_LETTERS[index]] == 1) {
                 quality -= 0.45
             }
         }
 
-        val difficultLetters = setOf('Ą', 'Ć', 'Ę', 'Ń', 'Ó', 'Ź', 'Ż', 'F')
-        val difficultCount = normalized.count { it in difficultLetters }
         quality -= (difficultCount - 1).coerceAtLeast(0) * 0.8
-
-        val consonantCount = normalized.count { it != '?' && it !in vowels }
         if (vowelCount == 0 && consonantCount >= 4) quality -= 1.5
-        if (vowelCount == letters.size && letters.size >= 4) quality -= 1.5
-
+        if (vowelCount == size && size >= 4) quality -= 1.5
         return quality
     }
+
+    private companion object {
+        const val TILE_LETTERS = "AĄBCĆDEĘFGHIJKLŁMNŃOÓPRSŚTUWYZŹŻ?"
+    }
+
 }

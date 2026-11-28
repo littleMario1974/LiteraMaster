@@ -1,7 +1,9 @@
 package com.littleMario.litera
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class BoardStateTest {
@@ -12,6 +14,15 @@ class BoardStateTest {
 
         assertEquals(225, board.cells.flatten().size)
         assertEquals(0, board.occupiedTiles().size)
+        assertFalse(board.hasTiles())
+    }
+
+    @Test
+    fun boardWithAnyOccupiedFieldHasTiles() {
+        val board = BoardState.empty()
+            .withTile(14, 14, BoardTile('Ż'))
+
+        assertTrue(board.hasTiles())
     }
 
     @Test
@@ -25,6 +36,7 @@ class BoardStateTest {
         assertEquals('I', board.tileAt(6, 7)?.normalizedLetter)
         assertEquals('Ś', board.tileAt(7, 7)?.normalizedLetter)
         assertEquals(3, board.occupiedTiles().size)
+        assertTrue(board.hasTiles())
     }
 
     @Test
@@ -40,6 +52,7 @@ class BoardStateTest {
         assertEquals('M', updated.tileAt(5, 7)?.normalizedLetter)
         assertEquals('Ś', updated.tileAt(7, 7)?.normalizedLetter)
         assertEquals(2, updated.occupiedTiles().size)
+        assertTrue(updated.hasTiles())
     }
 
     @Test(expected = IllegalArgumentException::class)

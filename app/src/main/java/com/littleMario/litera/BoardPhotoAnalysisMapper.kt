@@ -57,11 +57,11 @@ object BoardPhotoAnalysisMapper {
                 val letter = result.letter
 
                 if (letter != null) {
-                    // Kolor WHITE jest tylko wskazówką. Blank musi zostać potwierdzony ręcznie.
+                    // Zachowujemy wszystkie odczytane litery; poziom pewności
+                    // jest sygnalizowany użytkownikowi, a nie używany do ich
+                    // całkowitego odrzucania.
                     board = board.withTile(row, column, BoardTile(letter))
                 } else {
-                    // Zarówno pusty tekst, jak i niejednoznaczny tekst
-                    // pozostawiamy do ewentualnej weryfikacji.
                     unresolved += result
                 }
             }

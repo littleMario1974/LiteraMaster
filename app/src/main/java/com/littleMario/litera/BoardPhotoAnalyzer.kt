@@ -1,6 +1,7 @@
 package com.littleMario.litera
 
 import android.graphics.Bitmap
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Łączy wykrycie planszy, wycięcie 225 pól i rozpoznawanie liter.
@@ -51,13 +52,18 @@ class BoardPhotoAnalyzer(
             return
         }
 
-        var finished = false
+        val finished = AtomicBoolean(false)
+
+        fun closeRecognizerSafely() {
+            // Closing ML Kit is cleanup; it must not prevent the UI callback
+            // from receiving the actual analysis result or failure.
+            runCatching { recognizer.close() }
+        }
 
         fun finishWithError(exception: Exception) {
-            if (finished) return
-            finished = true
+            if (!finished.compareAndSet(false, true)) return
             recycleCells(cellBitmaps)
-            recognizer.close()
+            closeRecognizerSafely()
             onError(BoardPhotoAnalysisException.OcrFailed(exception))
         }
 
@@ -65,10 +71,9 @@ class BoardPhotoAnalyzer(
             recognizer.recognizeBoard(
                 cells = cellBitmaps,
                 onComplete = { results ->
-                    if (finished) return@recognizeBoard
-                    finished = true
+                    if (!finished.compareAndSet(false, true)) return@recognizeBoard
                     recycleCells(cellBitmaps)
-                    recognizer.close()
+                    closeRecognizerSafely()
 
                     val analysis = try {
                         BoardPhotoAnalysisMapper.map(geometry, results)

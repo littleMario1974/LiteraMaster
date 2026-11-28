@@ -53,6 +53,19 @@ data class BoardState(
         return BoardState(updatedRows)
     }
 
+    /**
+     * Checks whether the board contains any tile without allocating
+     * the PlacedTile list returned by [occupiedTiles].
+     */
+    fun hasTiles(): Boolean {
+        for (row in cells) {
+            for (tile in row) {
+                if (tile != null) return true
+            }
+        }
+        return false
+    }
+
     fun occupiedTiles(): List<PlacedTile> =
         buildList {
             cells.forEachIndexed { row, line ->

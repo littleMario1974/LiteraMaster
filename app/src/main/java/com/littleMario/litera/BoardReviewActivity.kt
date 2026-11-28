@@ -4,6 +4,7 @@ import android.app.AlertDialog
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.graphics.Matrix
 import android.graphics.Typeface
 import android.net.Uri
 import android.os.Bundle
@@ -20,6 +21,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.exifinterface.media.ExifInterface
 import java.io.DataInputStream
 import java.util.concurrent.Executors
 
@@ -303,24 +305,7 @@ class BoardReviewActivity : AppCompatActivity() {
 
         analysisExecutor.execute {
             val decoded = try {
-                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                contentResolver.openInputStream(uri)?.use {
-                    BitmapFactory.decodeStream(it, null, bounds)
-                }
-                if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
-                    null
-                } else {
-                    val sample = calculateSampleSize(
-                        bounds.outWidth, bounds.outHeight, MAX_IMAGE_SIDE
-                    )
-                    val options = BitmapFactory.Options().apply {
-                        inSampleSize = sample
-                        inPreferredConfig = Bitmap.Config.ARGB_8888
-                    }
-                    contentResolver.openInputStream(uri)?.use {
-                        BitmapFactory.decodeStream(it, null, options)
-                    }
-                }
+                decodePhotoWithOrientation(uri)
             } catch (_: Exception) {
                 null
             }
@@ -336,7 +321,11 @@ class BoardReviewActivity : AppCompatActivity() {
                     return@runOnUiThread
                 }
 
-                sourceBitmap?.recycle()
+                sourceBitmap?.let { previousBitmap ->
+                    analysisExecutor.execute {
+                        if (!previousBitmap.isRecycled) previousBitmap.recycle()
+                    }
+                }
                 sourceBitmap = decoded
                 currentBoard = BoardState.empty()
                 unresolvedPositions = emptySet()
@@ -352,6 +341,60 @@ class BoardReviewActivity : AppCompatActivity() {
                 analyzeButton.isEnabled = true
                 statusText.text = "Zdjęcie gotowe. Uruchom rozpoznawanie."
             }
+        }
+    }
+
+    /**
+     * Odczytuje orientację EXIF i obraca bitmapę przed podglądem oraz analizą.
+     * Dzięki temu zdjęcia wykonane pionowo i poziomo mają właściwy układ pikseli.
+     */
+    private fun decodePhotoWithOrientation(uri: Uri): Bitmap? {
+        val orientation = contentResolver.openInputStream(uri)?.use { stream ->
+            ExifInterface(stream).getAttributeInt(
+                ExifInterface.TAG_ORIENTATION,
+                ExifInterface.ORIENTATION_NORMAL
+            )
+        } ?: ExifInterface.ORIENTATION_NORMAL
+
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        contentResolver.openInputStream(uri)?.use {
+            BitmapFactory.decodeStream(it, null, bounds)
+        }
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+
+        val sample = calculateSampleSize(bounds.outWidth, bounds.outHeight, MAX_IMAGE_SIDE)
+        val options = BitmapFactory.Options().apply {
+            inSampleSize = sample
+            inPreferredConfig = Bitmap.Config.ARGB_8888
+        }
+        val bitmap = contentResolver.openInputStream(uri)?.use {
+            BitmapFactory.decodeStream(it, null, options)
+        } ?: return null
+
+        val matrix = Matrix()
+        when (orientation) {
+            ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
+            ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f)
+            ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
+            ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> matrix.setScale(-1f, 1f)
+            ExifInterface.ORIENTATION_FLIP_VERTICAL -> matrix.setScale(1f, -1f)
+            ExifInterface.ORIENTATION_TRANSPOSE -> {
+                matrix.setRotate(90f)
+                matrix.postScale(-1f, 1f)
+            }
+            ExifInterface.ORIENTATION_TRANSVERSE -> {
+                matrix.setRotate(270f)
+                matrix.postScale(-1f, 1f)
+            }
+        }
+        if (matrix.isIdentity) return bitmap
+
+        return try {
+            Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+                .also { if (it !== bitmap) bitmap.recycle() }
+        } catch (error: Exception) {
+            bitmap.recycle()
+            throw error
         }
     }
 
@@ -743,8 +786,16 @@ class BoardReviewActivity : AppCompatActivity() {
         (value * resources.displayMetrics.density).toInt()
 
     override fun onDestroy() {
-        sourceBitmap?.recycle()
+        // The detector and cell extractor use the source bitmap synchronously
+        // on analysisExecutor. Queue recycling behind any pending analysis so
+        // the bitmap cannot be recycled while OpenCV is still reading it.
+        val bitmapToRecycle = sourceBitmap
         sourceBitmap = null
+        analysisExecutor.execute {
+            bitmapToRecycle?.let { bitmap ->
+                if (!bitmap.isRecycled) bitmap.recycle()
+            }
+        }
         analysisExecutor.shutdown()
         super.onDestroy()
     }

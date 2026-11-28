@@ -211,4 +211,63 @@ class BoardMoveScorerTest {
         assertEquals(10, result.total)
     }
 
+
+    @Test
+    fun fastScoreMatchesDetailedScoreForMultipleCrossWords() {
+        val board = BoardState.empty()
+            .withTile(6, 6, BoardTile('A'))
+            .withTile(8, 6, BoardTile('E'))
+            .withTile(6, 7, BoardTile('A'))
+            .withTile(8, 7, BoardTile('E'))
+        val move = BoardMove(
+            word = "ko",
+            row = 7,
+            column = 6,
+            horizontal = true,
+            placements = listOf(
+                PlacedTile(7, 6, BoardTile('K')),
+                PlacedTile(7, 7, BoardTile('O'))
+            )
+        )
+        val scorer = BoardMoveScorer { _, _ -> BoardPremium.NONE }
+
+        assertEquals(10, scorer.score(board, move))
+        assertEquals(scorer.explain(board, move).total, scorer.score(board, move))
+    }
+
+    @Test
+    fun fastScoreMatchesDetailedScoreForVerticalMoveAndSevenTileBonus() {
+        val board = BoardState.empty()
+        val word = "abcdefg"
+        val placements = word.mapIndexed { index, letter ->
+            PlacedTile(index + 4, 7, BoardTile(letter.uppercaseChar()))
+        }
+        val move = BoardMove(word, 4, 7, false, placements)
+        val scorer = BoardMoveScorer { _, _ -> BoardPremium.NONE }
+
+        assertEquals(67, scorer.score(board, move))
+        assertEquals(scorer.explain(board, move).total, scorer.score(board, move))
+    }
+
+
+    @Test
+    fun detailedBreakdownKeepsZeroPointCrossWords() {
+        val board = BoardState.empty()
+            .withTile(6, 7, BoardTile('A', isBlank = true))
+        val move = BoardMove(
+            word = "o",
+            row = 7,
+            column = 7,
+            horizontal = true,
+            placements = listOf(PlacedTile(7, 7, BoardTile('O', isBlank = true)))
+        )
+        val scorer = BoardMoveScorer { _, _ -> BoardPremium.NONE }
+
+        val result = scorer.explain(board, move)
+
+        assertEquals(listOf(0), result.crossWordPoints)
+        assertEquals(0, result.total)
+        assertEquals(result.total, scorer.score(board, move))
+    }
+
 }
